@@ -22,7 +22,6 @@ Ce package ROS2 fournit une interface complète et modulaire pour contrôler un 
 drone_interface/
 ├── interface_node.py          # Nœud principal
 ├── config.py                  # Configuration centralisée
-├── test_drone_interface.py    # Tests unitaires
 ├── drone_examples.py          # Exemples et missions
 └── README.md                  # Documentation
 ```
@@ -208,13 +207,7 @@ ros2 run drone_interface interface_node
 
 ### Lancer les Tests Unitaires
 
-```bash
-# Tests complets
-python3 src/drone_interface/drone_interface/test_drone_interface.py
 
-# Ou via ROS2
-ros2 run drone_interface test_drone_interface
-```
 
 ### Tests de Performance
 
@@ -366,7 +359,6 @@ interface_node.py:
 1. Créer un nouveau manager dans `interface_node.py`
 2. L'initialiser dans `DroneInterface.__init__()`
 3. Ajouter les commandes dans `_handle_action_command()`
-4. Créer des tests dans `test_drone_interface.py`
 
 ### Bonnes Pratiques
 

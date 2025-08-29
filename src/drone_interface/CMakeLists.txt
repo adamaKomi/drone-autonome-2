@@ -23,10 +23,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CommandResponse.msg"
   "srv/DroneControl.srv"
   "srv/SafetyCheck.srv"
-  DEPENDENCIES
-    geometry_msgs
-    std_msgs
-    builtin_interfaces
+  "srv/DroneCommand.srv"
+  DEPENDENCIES geometry_msgs std_msgs sensor_msgs builtin_interfaces
 )
 
 # Install Python modules
@@ -36,7 +34,6 @@ ament_python_install_package(${PROJECT_NAME})
 install(PROGRAMS
   drone_interface/interface_node.py
   drone_interface/config.py
-  drone_interface/test_drone_interface.py
   drone_interface/drone_examples.py
   DESTINATION lib/${PROJECT_NAME}
 )
