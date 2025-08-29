@@ -41,6 +41,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Message types
 from std_msgs.msg import String, Bool, Float64
+from std_msgs.srv import SetString
 from geometry_msgs.msg import Point
 
 
@@ -614,21 +615,21 @@ class MissionNode(Node):
         """Configure les services"""
         # Service de contrôle de mission
         self.mission_control_service = self.create_service(
-            String,
+            SetString,
             '/drone/mission/control',
             self._handle_mission_control
         )
         
         # Service de chargement de mission
         self.load_mission_service = self.create_service(
-            String,
+            SetString,
             '/drone/mission/load',
             self._handle_load_mission
         )
         
         # Service de création de mission
         self.create_mission_service = self.create_service(
-            String,
+            SetString,
             '/drone/mission/create',
             self._handle_create_mission
         )
@@ -663,29 +664,36 @@ class MissionNode(Node):
             if command == "START":
                 success = self.mission_executor.start_mission()
                 response.data = "SUCCESS:Mission démarrée" if success else "ERROR:Impossible de démarrer"
+                response.success = success
                 
             elif command == "PAUSE":
                 self.mission_executor.pause_mission()
                 response.data = "SUCCESS:Mission en pause"
+                response.success = True
                 
             elif command == "RESUME":
                 self.mission_executor.resume_mission()
                 response.data = "SUCCESS:Mission reprise"
+                response.success = True
                 
             elif command == "STOP":
                 self.mission_executor.stop_mission()
                 response.data = "SUCCESS:Mission arrêtée"
+                response.success = True
                 
             elif command == "EMERGENCY":
                 self.mission_executor.emergency_abort()
                 response.data = "SUCCESS:Abandon d'urgence"
+                response.success = True
                 
             else:
                 response.data = f"ERROR:Commande inconnue: {command}"
+                response.success = False
                 
         except Exception as e:
             self.logger.error(f"❌ Erreur mission_control: {e}")
             response.data = f"ERROR:{str(e)}"
+            response.success = False
             
         return response
         
@@ -697,6 +705,7 @@ class MissionNode(Node):
             
             if not os.path.exists(mission_file):
                 response.data = f"ERROR:Mission '{mission_name}' non trouvée"
+                response.success = False
                 return response
                 
             # Charger la mission depuis le fichier
@@ -708,12 +717,15 @@ class MissionNode(Node):
             
             if success:
                 response.data = f"SUCCESS:Mission '{mission_name}' chargée"
+                response.success = True
             else:
                 response.data = f"ERROR:Impossible de charger '{mission_name}'"
+                response.success = False
                 
         except Exception as e:
             self.logger.error(f"❌ Erreur load_mission: {e}")
             response.data = f"ERROR:{str(e)}"
+            response.success = False
             
         return response
         
@@ -731,10 +743,12 @@ class MissionNode(Node):
                 json.dump(self._mission_to_dict(mission), f, indent=2)
                 
             response.data = f"SUCCESS:Mission '{mission.name}' créée et sauvegardée"
+            response.success = True
             
         except Exception as e:
             self.logger.error(f"❌ Erreur create_mission: {e}")
             response.data = f"ERROR:{str(e)}"
+            response.success = False
             
         return response
         
