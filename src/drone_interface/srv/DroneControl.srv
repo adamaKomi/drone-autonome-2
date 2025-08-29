@@ -1,0 +1,23 @@
+# Service for drone control operations
+# Provides synchronous command execution with response
+
+# Request
+string command_type            # Type of command (ARM, DISARM, TAKEOFF, etc.)
+string target_mode            # Target flight mode (for mode changes)
+geometry_msgs/Point target_position    # Target position
+float32 target_altitude       # Target altitude
+bool force_execution          # Force execution ignoring safety checks
+float32 timeout              # Command timeout in seconds
+string[] parameter_names      # Additional parameter names
+string[] parameter_values     # Additional parameter values
+
+---
+
+# Response
+bool success                  # Command execution success
+string message               # Result message or error description
+float32 execution_time       # Time taken to execute command
+geometry_msgs/Point final_position     # Final position after command
+string final_mode            # Final flight mode after command
+bool final_armed_state       # Final armed state after command
+int32 error_code             # Error code (0 = no error)

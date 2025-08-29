@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'navigation_node = drone_navigation.nav_node:main',
+            'navigation_node = drone_navigation.navigation_node:main',
         ],
     },
 )

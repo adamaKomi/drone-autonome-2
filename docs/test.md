@@ -28,3 +28,4 @@ Ce topic affiche l'état du drone (armé, mode, connexion, etc.).
 ros2 topic echo /mavros/setpoint_position/local
 ```
 pour vérifier la réception des commandes de position.
+
