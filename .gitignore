@@ -1,0 +1,36 @@
+# ROS2 workspace ignores
+build/
+install/
+log/
+*.pyc
+__pycache__/
+*.egg-info/
+*.swp
+*.bak
+*.tmp
+*.log
+*.tlog
+*.tlog.raw
+*.bin
+*.DAT
+# VSCode
+.vscode/
+# System files
+.DS_Store
+Thumbs.db
+# Documentation cache
+*.aux
+*.out
+*.toc
+*.pdf
+# Test artifacts
+src/*/test/__pycache__/
+# Drone/ArduPilot specific
+*.parms
+*.params
+# Python virtual environments
+venv/
+.env/
+# Misc
+*.old
+*.orig
