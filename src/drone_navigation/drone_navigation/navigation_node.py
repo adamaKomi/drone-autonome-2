@@ -26,572 +26,719 @@ Utilisation:
 import math
 import time
 import threading
+import numpy as np
 from enum import Enum
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any
 from dataclasses import dataclass
 
 # ROS2 imports
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
-from rclpy.action import ActionClient
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.task import Future
 
 # Message types
 from geometry_msgs.msg import PoseStamped, Point, Quaternion, TwistStamped, Vector3
-from geographic_msgs.msg import GeoPose
 from nav_msgs.msg import Path
-from std_msgs.msg import Header, String, Bool, Float64
-from std_srvs.srv import Trigger, SetBool
+from std_msgs.msg import Header, Float32, Bool, String
+from std_srvs.srv import SetBool, Trigger
+from sensor_msgs.msg import NavSatFix, Imu
 
-# Action types
-from drone_interface.action import NavigateToGoal, FollowPath
-
-# Custom service types (à créer avec ros2 interface)
-from drone_navigation.srv import (
-    SetWaypoint, 
-    GetWaypoints, 
-    ClearWaypoints,
-    SetVelocity,
-    SetPosition
-)
+# Action types - IMPORT CORRIGÉ
+from drone_navigation.action import NavigateToGoal, FollowPath
+from drone_navigation.srv import SetWaypoints, GetWaypoints, SetPosition, SetVelocity
+from drone_navigation.msg import Waypoint, NavigationStatus, ObstacleAlert
 
 
-class NavigationState(Enum):
-    """États de navigation possibles"""
+class NavigationState(str, Enum):
     IDLE = "IDLE"
+    TAKING_OFF = "TAKING_OFF"
     NAVIGATING = "NAVIGATING"
-    HOLDING = "HOLDING"
+    HOVERING = "HOVERING"
+    LANDING = "LANDING"
     EMERGENCY = "EMERGENCY"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+    RETURNING_HOME = "RETURNING_HOME"
 
 
 @dataclass
-class Waypoint:
-    """Structure pour un waypoint de navigation"""
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-    yaw: float = 0.0
-    tolerance: float = 0.5
-    wait_time: float = 0.0
-    name: str = ""
+class NavigationParams:
+    # Paramètres de navigation
+    max_velocity: float = 2.0  # m/s
+    max_acceleration: float = 1.0  # m/s²
+    position_tolerance: float = 0.3  # m
+    yaw_tolerance: float = 0.1  # rad
+    update_rate: float = 20.0  # Hz
+    safety_distance: float = 2.0  # m
+    max_altitude: float = 50.0  # m
+    min_altitude: float = 2.0  # m
 
 
-@dataclass
-class DronePosition:
-    """Position actuelle du drone"""
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-    yaw: float = 0.0
-    velocity_x: float = 0.0
-    velocity_y: float = 0.0
-    velocity_z: float = 0.0
-    timestamp: float = 0.0
-
-
-class NavigationController:
-    """Contrôleur de navigation pour le drone"""
+class PIDController:
+    """Contrôleur PID pour le contrôle de position et d'altitude"""
     
-    def __init__(self, node):
-        self.node = node
-        self.logger = node.get_logger()
+    def __init__(self, kp: float, ki: float, kd: float, max_output: float, min_output: float):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.max_output = max_output
+        self.min_output = min_output
         
-        # État de navigation
-        self.state = NavigationState.IDLE
-        self.current_waypoint = None
+        self.integral = 0.0
+        self.previous_error = 0.0
+        self.previous_time = None
+        
+    def compute(self, error: float, dt: float) -> float:
+        # Terme proportionnel
+        p_term = self.kp * error
+        
+        # Terme intégral avec anti-windup
+        self.integral += error * dt
+        i_term = self.ki * self.integral
+        
+        # Terme dérivé
+        d_term = self.kd * (error - self.previous_error) / dt if dt > 0 else 0.0
+        self.previous_error = error
+        
+        # Calcul de la sortie
+        output = p_term + i_term + d_term
+        
+        # Saturation de la sortie
+        output = np.clip(output, self.min_output, self.max_output)
+        
+        return output
+    
+    def reset(self):
+        self.integral = 0.0
+        self.previous_error = 0.0
+        self.previous_time = None
+
+
+class TrajectoryPlanner:
+    """Planificateur de trajectoire pour waypoints"""
+    
+    def __init__(self, params: NavigationParams):
+        self.params = params
+        self.current_waypoint_index = 0
         self.waypoints: List[Waypoint] = []
         
-        # Position actuelle
-        self.position = DronePosition()
+    def set_waypoints(self, waypoints: List[Waypoint]):
+        self.waypoints = waypoints
+        self.current_waypoint_index = 0
         
-        # Paramètres de navigation
-        self.max_velocity = 2.0  # m/s
-        self.position_tolerance = 0.3  # m
-        self.yaw_tolerance = 0.1  # rad
+    def get_next_waypoint(self) -> Optional[Waypoint]:
+        if self.current_waypoint_index < len(self.waypoints):
+            return self.waypoints[self.current_waypoint_index]
+        return None
+    
+    def advance_to_next_waypoint(self):
+        if self.current_waypoint_index < len(self.waypoints):
+            self.current_waypoint_index += 1
+            
+    def is_finished(self) -> bool:
+        return self.current_waypoint_index >= len(self.waypoints)
+    
+    def compute_trajectory(self, current_pose: PoseStamped, target_pose: PoseStamped) -> TwistStamped:
+        """Calcule la commande de vitesse pour suivre une trajectoire"""
+        twist = TwistStamped()
+        twist.header.stamp = current_pose.header.stamp
+        twist.header.frame_id = "map"
         
-        # Verrou pour accès thread-safe
-        self.lock = threading.RLock()
+        # Calcul des erreurs de position
+        dx = target_pose.pose.position.x - current_pose.pose.position.x
+        dy = target_pose.pose.position.y - current_pose.pose.position.y
+        dz = target_pose.pose.position.z - current_pose.pose.position.z
         
-        # Callbacks
-        self.navigation_callbacks = []
+        # Calcul de la distance
+        distance = math.sqrt(dx**2 + dy**2 + dz**2)
         
-    def update_position(self, pose: PoseStamped):
-        """Met à jour la position du drone"""
-        with self.lock:
-            self.position.x = pose.pose.position.x
-            self.position.y = pose.pose.position.y
-            self.position.z = pose.pose.position.z
-            self.position.timestamp = time.time()
+        if distance > self.params.position_tolerance:
+            # Normalisation et limitation de vitesse
+            vx = dx / distance * min(self.params.max_velocity, distance * 2.0)
+            vy = dy / distance * min(self.params.max_velocity, distance * 2.0)
+            vz = dz / distance * min(self.params.max_velocity, distance * 2.0)
             
-            # Extraire le yaw de l'orientation (quaternion)
-            orientation = pose.pose.orientation
-            self.position.yaw = self._quaternion_to_yaw(orientation)
-    
-    def update_velocity(self, twist: TwistStamped):
-        """Met à jour la vitesse du drone"""
-        with self.lock:
-            self.position.velocity_x = twist.twist.linear.x
-            self.position.velocity_y = twist.twist.linear.y
-            self.position.velocity_z = twist.twist.linear.z
-    
-    def add_waypoint(self, waypoint: Waypoint) -> bool:
-        """Ajoute un waypoint à la mission"""
-        with self.lock:
-            self.waypoints.append(waypoint)
-            self.logger.info(f"Waypoint ajouté: {waypoint.name} ({waypoint.x}, {waypoint.y}, {waypoint.z})")
-            return True
-    
-    def clear_waypoints(self) -> bool:
-        """Efface tous les waypoints"""
-        with self.lock:
-            self.waypoints.clear()
-            self.logger.info("Tous les waypoints effacés")
-            return True
-    
-    def get_waypoints(self) -> List[Waypoint]:
-        """Retourne la liste des waypoints"""
-        with self.lock:
-            return self.waypoints.copy()
-    
-    def start_navigation(self) -> bool:
-        """Démarre la navigation vers les waypoints"""
-        with self.lock:
-            if not self.waypoints:
-                self.logger.warn("Aucun waypoint défini")
-                return False
-            
-            if self.state != NavigationState.IDLE:
-                self.logger.warn(f"Navigation déjà en cours: {self.state}")
-                return False
-            
-            self.state = NavigationState.NAVIGATING
-            self.current_waypoint = self.waypoints[0]
-            self.logger.info(f"Début navigation vers: {self.current_waypoint.name}")
-            return True
-    
-    def stop_navigation(self) -> bool:
-        """Arrête la navigation en cours"""
-        with self.lock:
-            if self.state == NavigationState.IDLE:
-                return True
-            
-            self.state = NavigationState.IDLE
-            self.current_waypoint = None
-            self.logger.info("Navigation arrêtée")
-            return True
-    
-    def compute_navigation_command(self) -> Optional[Tuple[float, float, float, float]]:
-        """Calcule la commande de navigation vers le waypoint actuel"""
-        with self.lock:
-            if self.state != NavigationState.NAVIGATING or not self.current_waypoint:
-                return None
-            
-            # Calcul des erreurs de position
-            dx = self.current_waypoint.x - self.position.x
-            dy = self.current_waypoint.y - self.position.y
-            dz = self.current_waypoint.z - self.position.z
-            dyaw = self.current_waypoint.yaw - self.position.yaw
-            
-            # Normalisation de l'angle yaw
-            while dyaw > math.pi:
-                dyaw -= 2 * math.pi
-            while dyaw < -math.pi:
-                dyaw += 2 * math.pi
-            
-            # Distance totale
-            distance = math.sqrt(dx**2 + dy**2 + dz**2)
-            
-            # Vérification si le waypoint est atteint
-            if distance < self.current_waypoint.tolerance and abs(dyaw) < self.yaw_tolerance:
-                self.logger.info(f"Waypoint atteint: {self.current_waypoint.name}")
-                self._next_waypoint()
-                return None
-            
-            # Contrôle proportionnel simple
-            kp_linear = 0.5
-            kp_yaw = 0.8
-            
-            # Commandes de vitesse
-            vx = max(min(dx * kp_linear, self.max_velocity), -self.max_velocity)
-            vy = max(min(dy * kp_linear, self.max_velocity), -self.max_velocity)
-            vz = max(min(dz * kp_linear, self.max_velocity/2), -self.max_velocity/2)
-            vyaw = max(min(dyaw * kp_yaw, 1.0), -1.0)
-            
-            return vx, vy, vz, vyaw
-    
-    def _next_waypoint(self):
-        """Passe au waypoint suivant"""
-        if self.waypoints:
-            self.waypoints.pop(0)
-            if self.waypoints:
-                self.current_waypoint = self.waypoints[0]
-                self.logger.info(f"Navigation vers next waypoint: {self.current_waypoint.name}")
-            else:
-                self.current_waypoint = None
-                self.state = NavigationState.COMPLETED
-                self.logger.info("✅ Mission de navigation terminée!")
-                self._notify_navigation_complete(True)
-        else:
-            self.current_waypoint = None
-            self.state = NavigationState.IDLE
-    
-    def _quaternion_to_yaw(self, q: Quaternion) -> float:
-        """Convertit un quaternion en angle yaw (radians)"""
-        # Conversion quaternion to yaw
-        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        return math.atan2(siny_cosp, cosy_cosp)
-    
-    def add_navigation_callback(self, callback):
-        """Ajoute un callback pour les événements de navigation"""
-        self.navigation_callbacks.append(callback)
-    
-    def _notify_navigation_complete(self, success: bool):
-        """Notifie tous les callbacks de la fin de navigation"""
-        for callback in self.navigation_callbacks:
-            try:
-                callback(success)
-            except Exception as e:
-                self.logger.error(f"Error in navigation callback: {e}")
+            twist.twist.linear.x = vx
+            twist.twist.linear.y = vy
+            twist.twist.linear.z = vz
+        
+        return twist
 
 
-class DroneNavigation(Node):
-    """Nœud principal de navigation pour le drone"""
+class ObstacleAvoidance:
+    """Module d'évitement d'obstacles basique"""
     
+    def __init__(self, safety_distance: float):
+        self.safety_distance = safety_distance
+        self.obstacles_detected = False
+        self.obstacle_direction = np.array([0.0, 0.0, 0.0])
+        
+    def update_obstacles(self, obstacles: List[ObstacleAlert]):
+        """Met à jour la détection d'obstacles"""
+        self.obstacles_detected = len(obstacles) > 0
+        
+        if self.obstacles_detected:
+            # Calcul de la direction globale d'obstacle (moyenne des directions)
+            directions = np.array([[
+                obs.direction.x, 
+                obs.direction.y, 
+                obs.direction.z
+            ] for obs in obstacles])
+            
+            self.obstacle_direction = np.mean(directions, axis=0)
+            
+    def adjust_trajectory(self, trajectory: TwistStamped) -> TwistStamped:
+        """Ajuste la trajectoire pour éviter les obstacles"""
+        if not self.obstacles_detected:
+            return trajectory
+            
+        # Calcul de la composante d'évitement
+        avoidance_vector = self.obstacle_direction * self.safety_distance
+        
+        # Ajustement de la trajectoire
+        adjusted_trajectory = trajectory
+        adjusted_trajectory.twist.linear.x += avoidance_vector[0]
+        adjusted_trajectory.twist.linear.y += avoidance_vector[1]
+        adjusted_trajectory.twist.linear.z += avoidance_vector[2]
+        
+        return adjusted_trajectory
+
+
+class NavigationNode(Node):
     def __init__(self):
-        super().__init__('drone_navigation')
+        super().__init__('navigation_node')
         
         self.logger = self.get_logger()
-        self.logger.info("🧭 Initialisation du DroneNavigation...")
+        self.logger.info("🧭 Initialisation du NavigationNode...")
+        
+        # Paramètres de navigation
+        self.params = NavigationParams()
+        
+        # État de navigation
+        self.navigation_state = NavigationState.IDLE
+        self.current_pose = None
+        self.current_velocity = None
+        self.home_position = None
+        
+        # Modules de navigation
+        self.trajectory_planner = TrajectoryPlanner(self.params)
+        self.obstacle_avoidance = ObstacleAvoidance(self.params.safety_distance)
+        
+        # Contrôleurs PID
+        self.x_controller = PIDController(1.0, 0.01, 0.1, 2.0, -2.0)
+        self.y_controller = PIDController(1.0, 0.01, 0.1, 2.0, -2.0)
+        self.z_controller = PIDController(1.5, 0.01, 0.2, 2.0, -2.0)
+        self.yaw_controller = PIDController(1.0, 0.0, 0.1, 1.0, -1.0)
         
         # Configuration QoS
-        self.qos_profile = QoSProfile(
-            reliability=QoSReliabilityPolicy.RELIABLE,
+        qos_profile = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=10
         )
         
-        # Initialisation du contrôleur de navigation
-        self.nav_controller = NavigationController(self)
+        # Groupes de callback pour les actions
+        self.callback_group = ReentrantCallbackGroup()
         
-        # Setup des subscribers
-        self._setup_subscribers()
+        # Abonnements
+        self.pose_sub = self.create_subscription(
+            PoseStamped, '/mavros/local_position/pose', 
+            self.pose_callback, qos_profile)
         
-        # Setup des publishers
-        self._setup_publishers()
-        
-        # Setup des services
-        self._setup_services()
-        
-        # Setup des actions
-        self._setup_actions()
-        
-        # Timer pour le contrôle de navigation
-        self.control_timer = self.create_timer(0.1, self._navigation_control_callback)  # 10Hz
-        
-        self.logger.info("✅ DroneNavigation initialisé avec succès!")
-        self._print_node_info()
-    
-    def _setup_subscribers(self):
-        """Configure les subscribers"""
-        self.logger.info("📡 Configuration des subscribers...")
-        
-        # Position locale du drone
-        self.position_sub = self.create_subscription(
-            PoseStamped,
-            '/mavros/local_position/pose',
-            self.nav_controller.update_position,
-            self.qos_profile
-        )
-        
-        # Vitesse du drone
         self.velocity_sub = self.create_subscription(
-            TwistStamped,
-            '/mavros/local_position/velocity_local',
-            self.nav_controller.update_velocity,
-            self.qos_profile
-        )
+            TwistStamped, '/mavros/local_position/velocity_local', 
+            self.velocity_callback, qos_profile)
         
-        # État du drone (optionnel)
-        self.state_sub = self.create_subscription(
-            String,
-            '/drone/status',
-            self._drone_status_callback,
-            self.qos_profile
-        )
-    
-    def _setup_publishers(self):
-        """Configure les publishers"""
-        self.logger.info("📤 Configuration des publishers...")
+        self.obstacle_sub = self.create_subscription(
+            ObstacleAlert, '/perception/obstacles', 
+            self.obstacle_callback, 10)
         
-        # Commande de vitesse
-        self.velocity_pub = self.create_publisher(
-            TwistStamped,
-            '/mavros/setpoint_velocity/cmd_vel',
-            self.qos_profile
-        )
+        # Publications
+        self.setpoint_pub = self.create_publisher(
+            TwistStamped, '/mavros/setpoint_velocity/cmd_vel', 10)
         
-        # Commande de position
-        self.position_pub = self.create_publisher(
-            PoseStamped,
-            '/mavros/setpoint_position/local',
-            self.qos_profile
-        )
+        self.status_pub = self.create_publisher(
+            NavigationStatus, '/navigation/status', 10)
         
-        # État de navigation
-        self.nav_status_pub = self.create_publisher(
-            String,
-            '/drone/navigation/status',
-            self.qos_profile
-        )
+        self.path_pub = self.create_publisher(
+            Path, '/navigation/current_path', 10)
         
-        # Waypoints actuels
-        self.waypoints_pub = self.create_publisher(
-            String,
-            '/drone/navigation/waypoints',
-            self.qos_profile
-        )
-    
-    def _setup_services(self):
-        """Configure les services"""
-        self.logger.info("🔧 Configuration des services...")
+        # Services
+        self.set_position_service = self.create_service(
+            SetPosition, '/navigation/set_position', 
+            self.set_position_callback)
         
-        # Service pour ajouter un waypoint
-        self.set_waypoint_service = self.create_service(
-            SetWaypoint,
-            '/drone/navigation/set_waypoint',
-            self._handle_set_waypoint
-        )
+        self.set_velocity_service = self.create_service(
+            SetVelocity, '/navigation/set_velocity', 
+            self.set_velocity_callback)
         
-        # Service pour obtenir les waypoints
+        self.set_waypoints_service = self.create_service(
+            SetWaypoints, '/navigation/set_waypoints', 
+            self.set_waypoints_callback)
+        
         self.get_waypoints_service = self.create_service(
-            GetWaypoints,
-            '/drone/navigation/get_waypoints',
-            self._handle_get_waypoints
-        )
+            GetWaypoints, '/navigation/get_waypoints', 
+            self.get_waypoints_callback)
         
-        # Service pour effacer les waypoints
-        self.clear_waypoints_service = self.create_service(
-            ClearWaypoints,
-            '/drone/navigation/clear_waypoints',
-            self._handle_clear_waypoints
-        )
+        self.return_home_service = self.create_service(
+            Trigger, '/navigation/return_home', 
+            self.return_home_callback)
         
-        # Service pour démarrer la navigation
-        self.start_nav_service = self.create_service(
-            Trigger,
-            '/drone/navigation/start',
-            self._handle_start_navigation
-        )
+        self.hold_position_service = self.create_service(
+            Trigger, '/navigation/hold_position', 
+            self.hold_position_callback)
         
-        # Service pour arrêter la navigation
-        self.stop_nav_service = self.create_service(
-            Trigger,
-            '/drone/navigation/stop',
-            self._handle_stop_navigation
-        )
+        # Actions
+        self.navigate_action_server = ActionServer(
+            self, NavigateToGoal, '/navigation/navigate_to_goal',
+            execute_callback=self.navigate_to_goal_callback,
+            goal_callback=self.navigate_goal_callback,
+            cancel_callback=self.navigate_cancel_callback,
+            callback_group=self.callback_group)
+        
+        self.follow_path_action_server = ActionServer(
+            self, FollowPath, '/navigation/follow_path',
+            execute_callback=self.follow_path_callback,
+            goal_callback=self.follow_path_goal_callback,
+            cancel_callback=self.follow_path_cancel_callback,
+            callback_group=self.callback_group)
+        
+        # Timer pour la boucle de contrôle
+        self.control_timer = self.create_timer(
+            1.0 / self.params.update_rate, 
+            self.control_loop_callback)
+        
+        self.logger.info("✅ NavigationNode initialisé")
     
-    def _setup_actions(self):
-        """Configure les actions"""
-        self.logger.info("⚡ Configuration des actions...")
+    def pose_callback(self, msg: PoseStamped):
+        """Callback de mise à jour de la position"""
+        self.current_pose = msg
         
-        # Action pour navigation vers un goal
-        self.navigate_action = ActionClient(
-            self,
-            NavigateToGoal,
-            '/drone/navigation/navigate_to_goal'
-        )
-        
-        # Action pour suivre un chemin
-        self.follow_path_action = ActionClient(
-            self,
-            FollowPath,
-            '/drone/navigation/follow_path'
-        )
+        # Définition de la position home si non définie
+        if self.home_position is None and self.navigation_state == NavigationState.IDLE:
+            self.home_position = msg
+            self.logger.info(f"🏠 Position home définie: {msg.pose.position}")
     
-    def _handle_set_waypoint(self, request, response):
-        """Gère l'ajout d'un waypoint"""
+    def velocity_callback(self, msg: TwistStamped):
+        """Callback de mise à jour de la vitesse"""
+        self.current_velocity = msg
+    
+    def obstacle_callback(self, msg: ObstacleAlert):
+        """Callback de détection d'obstacles"""
+        # Cette implémentation simplifiée suppose un message par obstacle
+        # Dans une implémentation réelle, on aurait une liste d'obstacles
+        self.obstacle_avoidance.update_obstacles([msg])
+    
+    def set_position_callback(self, request, response):
+        """Service pour définir une position cible"""
         try:
-            waypoint = Waypoint(
-                x=request.x,
-                y=request.y,
-                z=request.z,
-                yaw=request.yaw,
-                tolerance=request.tolerance,
-                wait_time=request.wait_time,
-                name=request.name
-            )
+            if self.navigation_state != NavigationState.IDLE:
+                response.success = False
+                response.message = "Navigation déjà en cours"
+                return response
+                
+            # Création d'un waypoint à partir de la requête
+            waypoint = Waypoint()
+            waypoint.position = request.position
+            waypoint.yaw = request.yaw
+            waypoint.tolerance = self.params.position_tolerance
+            waypoint.yaw_tolerance = self.params.yaw_tolerance
             
-            success = self.nav_controller.add_waypoint(waypoint)
-            response.success = success
-            response.message = f"Waypoint {request.name} ajouté" if success else "Échec ajout waypoint"
-            
-        except Exception as e:
-            self.logger.error(f"Erreur set_waypoint: {e}")
-            response.success = False
-            response.message = f"Erreur: {str(e)}"
-        
-        return response
-    
-    def _handle_get_waypoints(self, request, response):
-        """Gère la récupération des waypoints"""
-        try:
-            waypoints = self.nav_controller.get_waypoints()
-            response.waypoints = []
-            
-            for wp in waypoints:
-                response.waypoints.append({
-                    'x': wp.x,
-                    'y': wp.y,
-                    'z': wp.z,
-                    'yaw': wp.yaw,
-                    'tolerance': wp.tolerance,
-                    'wait_time': wp.wait_time,
-                    'name': wp.name
-                })
+            # Navigation vers la position
+            self.trajectory_planner.set_waypoints([waypoint])
+            self.navigation_state = NavigationState.NAVIGATING
             
             response.success = True
-            response.message = f"{len(waypoints)} waypoints récupérés"
+            response.message = "Navigation vers la position démarrée"
             
         except Exception as e:
-            self.logger.error(f"Erreur get_waypoints: {e}")
             response.success = False
             response.message = f"Erreur: {str(e)}"
-        
+            
         return response
     
-    def _handle_clear_waypoints(self, request, response):
-        """Gère l'effacement des waypoints"""
+    def set_velocity_callback(self, request, response):
+        """Service pour définir une vitesse"""
         try:
-            success = self.nav_controller.clear_waypoints()
-            response.success = success
-            response.message = "Waypoints effacés" if success else "Échec effacement"
+            if self.navigation_state != NavigationState.IDLE:
+                response.success = False
+                response.message = "Navigation déjà en cours"
+                return response
+                
+            # Publication directe de la vitesse
+            twist = TwistStamped()
+            twist.header.stamp = self.get_clock().now().to_msg()
+            twist.twist.linear = request.velocity
+            twist.twist.angular.z = request.yaw_rate
+            
+            self.setpoint_pub.publish(twist)
+            self.navigation_state = NavigationState.HOVERING
+            
+            response.success = True
+            response.message = "Contrôle de vitesse activé"
             
         except Exception as e:
-            self.logger.error(f"Erreur clear_waypoints: {e}")
             response.success = False
             response.message = f"Erreur: {str(e)}"
-        
+            
         return response
     
-    def _handle_start_navigation(self, request, response):
-        """Démarre la navigation"""
+    def set_waypoints_callback(self, request, response):
+        """Service pour définir une liste de waypoints"""
         try:
-            success = self.nav_controller.start_navigation()
-            response.success = success
-            response.message = "Navigation démarrée" if success else "Échec démarrage navigation"
+            if self.navigation_state != NavigationState.IDLE:
+                response.success = False
+                response.message = "Navigation déjà en cours"
+                return response
+                
+            # Validation des waypoints
+            for wp in request.waypoints:
+                if wp.position.z > self.params.max_altitude:
+                    response.success = False
+                    response.message = f"Altitude {wp.position.z} supérieure au maximum {self.params.max_altitude}"
+                    return response
+                    
+                if wp.position.z < self.params.min_altitude:
+                    response.success = False
+                    response.message = f"Altitude {wp.position.z} inférieure au minimum {self.params.min_altitude}"
+                    return response
+            
+            # Définition des waypoints
+            self.trajectory_planner.set_waypoints(request.waypoints)
+            self.navigation_state = NavigationState.NAVIGATING
+            
+            response.success = True
+            response.message = f"{len(request.waypoints)} waypoints définis"
             
         except Exception as e:
-            self.logger.error(f"Erreur start_navigation: {e}")
             response.success = False
             response.message = f"Erreur: {str(e)}"
-        
+            
         return response
     
-    def _handle_stop_navigation(self, request, response):
-        """Arrête la navigation"""
+    def get_waypoints_callback(self, request, response):
+        """Service pour obtenir la liste des waypoints actuels"""
         try:
-            success = self.nav_controller.stop_navigation()
-            response.success = success
-            response.message = "Navigation arrêtée" if success else "Échec arrêt navigation"
+            response.waypoints = self.trajectory_planner.waypoints
+            response.success = True
+            response.message = "Waypoints récupérés avec succès"
             
         except Exception as e:
-            self.logger.error(f"Erreur stop_navigation: {e}")
             response.success = False
             response.message = f"Erreur: {str(e)}"
-        
+            
         return response
     
-    def _navigation_control_callback(self):
-        """Callback pour le contrôle de navigation"""
+    def return_home_callback(self, request, response):
+        """Service pour retourner à la position home"""
         try:
-            # Calculer la commande de navigation
-            command = self.nav_controller.compute_navigation_command()
+            if self.home_position is None:
+                response.success = False
+                response.message = "Position home non définie"
+                return response
+                
+            # Création d'un waypoint pour la position home
+            waypoint = Waypoint()
+            waypoint.position = self.home_position.pose.position
+            waypoint.yaw = 0.0
+            waypoint.tolerance = self.params.position_tolerance
             
-            if command:
-                vx, vy, vz, vyaw = command
-                
-                # Publier la commande de vitesse
-                twist_msg = TwistStamped()
-                twist_msg.header.stamp = self.get_clock().now().to_msg()
-                twist_msg.header.frame_id = "map"
-                
-                twist_msg.twist.linear = Vector3(x=float(vx), y=float(vy), z=float(vz))
-                twist_msg.twist.angular = Vector3(x=0.0, y=0.0, z=float(vyaw))
-                
-                self.velocity_pub.publish(twist_msg)
-                
-                # Publier l'état de navigation
-                self._publish_navigation_status()
+            # Navigation vers home
+            self.trajectory_planner.set_waypoints([waypoint])
+            self.navigation_state = NavigationState.RETURNING_HOME
+            
+            response.success = True
+            response.message = "Retour à la maison initié"
             
         except Exception as e:
-            self.logger.error(f"Erreur navigation control: {e}")
+            response.success = False
+            response.message = f"Erreur: {str(e)}"
+            
+        return response
     
-    def _publish_navigation_status(self):
+    def hold_position_callback(self, request, response):
+        """Service pour maintenir la position actuelle"""
+        try:
+            if self.current_pose is None:
+                response.success = False
+                response.message = "Position actuelle inconnue"
+                return response
+                
+            # Arrêt de tout mouvement
+            twist = TwistStamped()
+            twist.header.stamp = self.get_clock().now().to_msg()
+            self.setpoint_pub.publish(twist)
+            
+            # Remettre le système en état IDLE pour permettre de nouveaux commands
+            self.navigation_state = NavigationState.IDLE
+            
+            response.success = True
+            response.message = "Position maintenue"
+            
+        except Exception as e:
+            response.success = False
+            response.message = f"Erreur: {str(e)}"
+            
+        return response
+    
+    def navigate_goal_callback(self, goal_request):
+        """Callback pour l'acceptation des goals de navigation"""
+        if self.navigation_state != NavigationState.IDLE:
+            self.get_logger().warn("Navigation déjà en cours - rejet du goal")
+            return GoalResponse.REJECT
+            
+        return GoalResponse.ACCEPT
+    
+    def navigate_cancel_callback(self, goal_handle):
+        """Callback pour l'annulation de navigation"""
+        self.get_logger().info("Annulation de la navigation demandée")
+        return CancelResponse.ACCEPT
+    
+    def navigate_to_goal_callback(self, goal_handle):
+        """Callback d'exécution pour la navigation vers un goal"""
+        try:
+            goal = goal_handle.request
+            
+            # Création du waypoint à partir du goal
+            waypoint = Waypoint()
+            waypoint.position = goal.target_position
+            waypoint.yaw = goal.target_yaw
+            waypoint.tolerance = goal.position_tolerance if goal.position_tolerance > 0 else self.params.position_tolerance
+            waypoint.yaw_tolerance = goal.yaw_tolerance if goal.yaw_tolerance > 0 else self.params.yaw_tolerance
+            
+            # Définition du waypoint
+            self.trajectory_planner.set_waypoints([waypoint])
+            self.navigation_state = NavigationState.NAVIGATING
+            
+            # Boucle de navigation
+            result = NavigateToGoal.Result()
+            feedback = NavigateToGoal.Feedback()
+            
+            while self.navigation_state == NavigationState.NAVIGATING:
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    self.navigation_state = NavigationState.IDLE
+                    result.success = False
+                    result.message = "Navigation annulée"
+                    return result
+                
+                # Publication du feedback
+                if self.current_pose:
+                    dx = waypoint.position.x - self.current_pose.pose.position.x
+                    dy = waypoint.position.y - self.current_pose.pose.position.y
+                    dz = waypoint.position.z - self.current_pose.pose.position.z
+                    distance = math.sqrt(dx**2 + dy**2 + dz**2)
+                    
+                    feedback.distance_to_goal = distance
+                    goal_handle.publish_feedback(feedback)
+                
+                # Vérification de l'atteinte du goal
+                if self.check_waypoint_reached(waypoint):
+                    self.navigation_state = NavigationState.IDLE
+                    result.success = True
+                    result.message = "Goal atteint avec succès"
+                    goal_handle.succeed()
+                    return result
+                
+                # Attente avant la prochaine itération
+                time.sleep(0.1)
+            
+            # Si on sort de la boucle sans avoir atteint le goal
+            result.success = False
+            result.message = "Navigation interrompue"
+            goal_handle.abort()
+            return result
+            
+        except Exception as e:
+            self.get_logger().error(f"Erreur lors de la navigation: {str(e)}")
+            result.success = False
+            result.message = f"Erreur: {str(e)}"
+            goal_handle.abort()
+            return result
+    
+    def follow_path_goal_callback(self, goal_request):
+        """Callback pour l'acceptation des goals de suivi de chemin"""
+        if self.navigation_state != NavigationState.IDLE:
+            self.get_logger().warn("Navigation déjà en cours - rejet du goal")
+            return GoalResponse.REJECT
+            
+        return GoalResponse.ACCEPT
+    
+    def follow_path_cancel_callback(self, goal_handle):
+        """Callback pour l'annulation de suivi de chemin"""
+        self.get_logger().info("Annulation du suivi de chemin demandée")
+        return CancelResponse.ACCEPT
+    
+    def follow_path_callback(self, goal_handle):
+        """Callback d'exécution pour le suivi de chemin"""
+        try:
+            goal = goal_handle.request
+            
+            # Validation des waypoints
+            for wp in goal.waypoints:
+                if wp.position.z > self.params.max_altitude:
+                    result = FollowPath.Result()
+                    result.success = False
+                    result.message = f"Altitude {wp.position.z} supérieure au maximum {self.params.max_altitude}"
+                    goal_handle.abort()
+                    return result
+                    
+                if wp.position.z < self.params.min_altitude:
+                    result = FollowPath.Result()
+                    result.success = False
+                    result.message = f"Altitude {wp.position.z} inférieure au minimum {self.params.min_altitude}"
+                    goal_handle.abort()
+                    return result
+            
+            # Définition des waypoints
+            self.trajectory_planner.set_waypoints(goal.waypoints)
+            self.navigation_state = NavigationState.NAVIGATING
+            
+            # Boucle de navigation
+            result = FollowPath.Result()
+            feedback = FollowPath.Feedback()
+            
+            while self.navigation_state == NavigationState.NAVIGATING:
+                if goal_handle.is_cancel_requested:
+                    goal_handle.canceled()
+                    self.navigation_state = NavigationState.IDLE
+                    result.success = False
+                    result.message = "Suivi de chemin annulé"
+                    return result
+                
+                # Publication du feedback
+                feedback.current_waypoint_index = self.trajectory_planner.current_waypoint_index
+                feedback.waypoints_completed = feedback.current_waypoint_index
+                feedback.waypoints_total = len(goal.waypoints)
+                
+                if self.current_pose and self.trajectory_planner.get_next_waypoint():
+                    next_wp = self.trajectory_planner.get_next_waypoint()
+                    dx = next_wp.position.x - self.current_pose.pose.position.x
+                    dy = next_wp.position.y - self.current_pose.pose.position.y
+                    dz = next_wp.position.z - self.current_pose.pose.position.z
+                    feedback.distance_to_next_waypoint = math.sqrt(dx**2 + dy**2 + dz**2)
+                
+                goal_handle.publish_feedback(feedback)
+                
+                # Vérification de l'atteinte du waypoint courant
+                current_waypoint = self.trajectory_planner.get_next_waypoint()
+                if current_waypoint and self.check_waypoint_reached(current_waypoint):
+                    self.trajectory_planner.advance_to_next_waypoint()
+                
+                # Vérification de la fin du chemin
+                if self.trajectory_planner.is_finished():
+                    self.navigation_state = NavigationState.IDLE
+                    result.success = True
+                    result.message = "Chefin complété avec succès"
+                    goal_handle.succeed()
+                    return result
+                
+                # Attente avant la prochaine itération
+                time.sleep(0.1)
+            
+            # Si on sort de la boucle sans avoir complété le chemin
+            result.success = False
+            result.message = "Suivi de chemin interrompu"
+            goal_handle.abort()
+            return result
+            
+        except Exception as e:
+            self.get_logger().error(f"Erreur lors du suivi de chemin: {str(e)}")
+            result.success = False
+            result.message = f"Erreur: {str(e)}"
+            goal_handle.abort()
+            return result
+    
+    def control_loop_callback(self):
+        """Boucle de contrôle principale"""
+        if self.current_pose is None:
+            return
+        
+        # Publication de l'état
+        self.publish_status()
+        
+        # Gestion selon l'état de navigation
+        if self.navigation_state == NavigationState.NAVIGATING:
+            self.execute_navigation()
+        elif self.navigation_state == NavigationState.RETURNING_HOME:
+            self.execute_navigation()
+        elif self.navigation_state == NavigationState.HOVERING:
+            # Rien à faire, on maintient la position
+            pass
+    
+    def execute_navigation(self):
+        """Exécute la navigation vers le waypoint courant"""
+        next_waypoint = self.trajectory_planner.get_next_waypoint()
+        if next_waypoint is None:
+            self.navigation_state = NavigationState.IDLE
+            return
+        
+        # Vérification si le waypoint est atteint
+        if self.check_waypoint_reached(next_waypoint):
+            self.trajectory_planner.advance_to_next_waypoint()
+            
+            # Vérification si c'était le dernier waypoint
+            if self.trajectory_planner.is_finished():
+                self.navigation_state = NavigationState.IDLE
+                self.logger.info("✅ Navigation terminée - Tous les waypoints atteints")
+                return
+        
+        # Calcul de la trajectoire
+        target_pose = PoseStamped()
+        target_pose.header.stamp = self.get_clock().now().to_msg()
+        target_pose.pose.position = next_waypoint.position
+        
+        # Calcul de la commande de vitesse
+        trajectory = self.trajectory_planner.compute_trajectory(self.current_pose, target_pose)
+        
+        # Ajustement pour l'évitement d'obstacles
+        trajectory = self.obstacle_avoidance.adjust_trajectory(trajectory)
+        
+        # Publication de la commande
+        self.setpoint_pub.publish(trajectory)
+    
+    def check_waypoint_reached(self, waypoint: Waypoint) -> bool:
+        """Vérifie si le waypoint a été atteint"""
+        if self.current_pose is None:
+            return False
+        
+        # Calcul de la distance
+        dx = waypoint.position.x - self.current_pose.pose.position.x
+        dy = waypoint.position.y - self.current_pose.pose.position.y
+        dz = waypoint.position.z - self.current_pose.pose.position.z
+        distance = math.sqrt(dx**2 + dy**2 + dz**2)
+        
+        # Vérification de la tolérance
+        tolerance = waypoint.tolerance if waypoint.tolerance > 0 else self.params.position_tolerance
+        return distance <= tolerance
+    
+    def publish_status(self):
         """Publie l'état de navigation"""
-        status_msg = String()
-        status_data = {
-            'state': self.nav_controller.state.value,
-            'current_waypoint': self.nav_controller.current_waypoint.name if self.nav_controller.current_waypoint else None,
-            'remaining_waypoints': len(self.nav_controller.waypoints)
-        }
-        status_msg.data = str(status_data)
-        self.nav_status_pub.publish(status_msg)
-    
-    def _drone_status_callback(self, msg: String):
-        """Callback pour l'état du drone"""
-        # Peut être utilisé pour réagir aux changements d'état du drone
-        pass
-    
-    def _print_node_info(self):
-        """Affiche les informations du nœud"""
-        info = [
-            "=" * 60,
-            "🧭 DRONE NAVIGATION NODE - Contrôle de position",
-            "=" * 60,
-            "📡 Subscribers:",
-            "   - /mavros/local_position/pose",
-            "   - /mavros/local_position/velocity_local", 
-            "   - /drone/status",
-            "",
-            "📤 Publishers:",
-            "   - /mavros/setpoint_velocity/cmd_vel",
-            "   - /mavros/setpoint_position/local",
-            "   - /drone/navigation/status",
-            "   - /drone/navigation/waypoints",
-            "",
-            "🔧 Services:",
-            "   - /drone/navigation/set_waypoint",
-            "   - /drone/navigation/get_waypoints", 
-            "   - /drone/navigation/clear_waypoints",
-            "   - /drone/navigation/start",
-            "   - /drone/navigation/stop",
-            "",
-            "⚡ Actions:",
-            "   - /drone/navigation/navigate_to_goal",
-            "   - /drone/navigation/follow_path",
-            "=" * 60
-        ]
+        status = NavigationStatus()
+        status.header.stamp = self.get_clock().now().to_msg()
+        status.state = self.navigation_state.value
         
-        for line in info:
-            self.logger.info(line)
+        if self.current_pose:
+            status.current_position = self.current_pose.pose.position
+        
+        if self.trajectory_planner.get_next_waypoint():
+            status.next_waypoint = self.trajectory_planner.get_next_waypoint().position
+        
+        status.waypoints_completed = self.trajectory_planner.current_waypoint_index
+        status.waypoints_total = len(self.trajectory_planner.waypoints)
+        
+        self.status_pub.publish(status)
 
 
 def main(args=None):
-    """Point d'entrée principal"""
     rclpy.init(args=args)
+    node = NavigationNode()
     
     try:
-        node = DroneNavigation()
         rclpy.spin(node)
-        
     except KeyboardInterrupt:
-        node.logger.info("🛑 Arrêt demandé")
-    except Exception as e:
-        node.logger.error(f"💥 Erreur fatale: {e}")
+        node.logger.info("🛑 Arrêt du NavigationNode")
     finally:
         node.destroy_node()
         rclpy.shutdown()

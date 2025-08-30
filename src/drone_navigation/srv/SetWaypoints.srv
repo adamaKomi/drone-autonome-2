@@ -1,0 +1,4 @@
+drone_navigation/Waypoint[] waypoints
+---
+bool success
+string message

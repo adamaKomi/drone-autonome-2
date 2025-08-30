@@ -1,0 +1,12 @@
+# Goal definition
+drone_navigation/Waypoint[] waypoints
+---
+# Result definition
+bool success
+string message
+---
+# Feedback definition
+uint32 current_waypoint_index
+uint32 waypoints_completed
+uint32 waypoints_total
+float32 distance_to_next_waypoint
