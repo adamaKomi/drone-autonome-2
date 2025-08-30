@@ -1,0 +1,6 @@
+std_msgs/Header header
+string state
+geometry_msgs/Point current_position
+geometry_msgs/Point next_waypoint
+uint32 waypoints_completed
+uint32 waypoints_total
