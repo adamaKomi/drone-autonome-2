@@ -1,0 +1,11 @@
+Pour résumer, un drone fonctionnel minimal comprend les éléments suivants :
+
+| Composante        | Fonction principale       |
+| ----------------- | ------------------------- |
+| Structure         | Support mécanique         |
+| Moteurs + Hélices | Génération de poussée     |
+| ESC               | Contrôle des moteurs      |
+| Contrôleur de vol | Pilotage et stabilisation |
+| Récepteur radio   | Réception des commandes   |
+| Batterie          | Alimentation              |
+| Capteurs (IMU)    | Mesure et stabilisation   |
