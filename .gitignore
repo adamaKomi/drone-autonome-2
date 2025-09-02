@@ -2,7 +2,10 @@
 build/
 install/
 log/
-*.pyc
+*logs/
+logs/*
+/logs/
+logs
 __pycache__/
 *.egg-info/
 *.swp
