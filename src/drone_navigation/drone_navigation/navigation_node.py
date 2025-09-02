@@ -258,6 +258,10 @@ class NavigationNode(Node):
         self.setpoint_pub = self.create_publisher(
             TwistStamped, '/mavros/setpoint_velocity/cmd_vel', 10)
         
+        # Publication pour maintenir les setpoints actifs
+        self.setpoint_raw_pub = self.create_publisher(
+            PoseStamped, '/mavros/setpoint_position/pose', 10)
+        
         self.status_pub = self.create_publisher(
             NavigationStatus, '/navigation/status', 10)
         
@@ -289,6 +293,11 @@ class NavigationNode(Node):
             Trigger, '/navigation/hold_position', 
             self.hold_position_callback)
         
+        # Service pour préparer l'armement
+        self.prepare_arm_service = self.create_service(
+            Trigger, '/navigation/prepare_arm',
+            self.prepare_arm_callback)
+        
         # Actions
         self.navigate_action_server = ActionServer(
             self, NavigateToGoal, '/navigation/navigate_to_goal',
@@ -308,6 +317,11 @@ class NavigationNode(Node):
         self.control_timer = self.create_timer(
             1.0 / self.params.update_rate, 
             self.control_loop_callback)
+        
+        # Timer pour maintenir les setpoints actifs (requis par MAVROS)
+        self.setpoint_timer = self.create_timer(
+            0.1,  # 10 Hz
+            self.publish_setpoint_keepalive)
         
         self.logger.info("✅ NavigationNode initialisé")
     
@@ -475,6 +489,34 @@ class NavigationNode(Node):
             
             response.success = True
             response.message = "Position maintenue"
+            
+        except Exception as e:
+            response.success = False
+            response.message = f"Erreur: {str(e)}"
+            
+        return response
+    
+    def prepare_arm_callback(self, request, response):
+        """Service pour préparer l'armement en publiant des setpoints"""
+        try:
+            if self.current_pose is None:
+                response.success = False
+                response.message = "Position actuelle inconnue"
+                return response
+            
+            # Publier la position actuelle comme setpoint plusieurs fois
+            # Ceci est requis par MAVROS avant l'armement
+            for i in range(20):  # Publier 20 fois à 10Hz = 2 secondes
+                setpoint = PoseStamped()
+                setpoint.header.stamp = self.get_clock().now().to_msg()
+                setpoint.header.frame_id = "map"
+                setpoint.pose = self.current_pose.pose
+                self.setpoint_raw_pub.publish(setpoint)
+                time.sleep(0.1)
+            
+            response.success = True
+            response.message = "Setpoints publiés - prêt pour armement"
+            self.logger.info("📡 Setpoints publiés pour préparer l'armement")
             
         except Exception as e:
             response.success = False
@@ -650,6 +692,23 @@ class NavigationNode(Node):
             goal_handle.abort()
             return result
     
+    def publish_setpoint_keepalive(self):
+        """Publie périodiquement des setpoints pour maintenir MAVROS actif"""
+        if self.current_pose is not None:
+            # Publication de la position actuelle pour maintenir les setpoints actifs
+            setpoint = PoseStamped()
+            setpoint.header.stamp = self.get_clock().now().to_msg()
+            setpoint.header.frame_id = "map"
+            
+            if self.navigation_state == NavigationState.IDLE:
+                # En mode IDLE, maintenir la position actuelle
+                setpoint.pose = self.current_pose.pose
+            else:
+                # En navigation, laisser le contrôleur principal gérer
+                return
+                
+            self.setpoint_raw_pub.publish(setpoint)
+    
     def control_loop_callback(self):
         """Boucle de contrôle principale"""
         if self.current_pose is None:
@@ -682,21 +741,56 @@ class NavigationNode(Node):
             if self.trajectory_planner.is_finished():
                 self.navigation_state = NavigationState.IDLE
                 self.logger.info("✅ Navigation terminée - Tous les waypoints atteints")
+                
+                # Publier setpoint de position actuelle pour arrêter
+                if self.current_pose:
+                    stop_setpoint = PoseStamped()
+                    stop_setpoint.header.stamp = self.get_clock().now().to_msg()
+                    stop_setpoint.header.frame_id = "map"
+                    stop_setpoint.pose = self.current_pose.pose
+                    self.setpoint_raw_pub.publish(stop_setpoint)
                 return
         
-        # Calcul de la trajectoire
+        # Publication directe du setpoint de position (plus fiable que la vitesse)
+        target_setpoint = PoseStamped()
+        target_setpoint.header.stamp = self.get_clock().now().to_msg()
+        target_setpoint.header.frame_id = "map"
+        target_setpoint.pose.position = next_waypoint.position
+        
+        # Conserver l'orientation actuelle si disponible
+        if self.current_pose:
+            target_setpoint.pose.orientation = self.current_pose.pose.orientation
+        
+        # Publication du setpoint de position
+        self.setpoint_raw_pub.publish(target_setpoint)
+        
+        # Calcul et publication des commandes de vitesse en backup
         target_pose = PoseStamped()
         target_pose.header.stamp = self.get_clock().now().to_msg()
         target_pose.pose.position = next_waypoint.position
         
-        # Calcul de la commande de vitesse
         trajectory = self.trajectory_planner.compute_trajectory(self.current_pose, target_pose)
-        
-        # Ajustement pour l'évitement d'obstacles
         trajectory = self.obstacle_avoidance.adjust_trajectory(trajectory)
+        trajectory.header.stamp = self.get_clock().now().to_msg()
+        trajectory.header.frame_id = "map"
         
-        # Publication de la commande
+        # Publication des deux types de commandes
         self.setpoint_pub.publish(trajectory)
+        
+        # Log de debug
+        if self.current_pose:
+            distance = math.sqrt(
+                (next_waypoint.position.x - self.current_pose.pose.position.x)**2 +
+                (next_waypoint.position.y - self.current_pose.pose.position.y)**2 +
+                (next_waypoint.position.z - self.current_pose.pose.position.z)**2
+            )
+            
+            if hasattr(self, '_last_debug_time'):
+                if time.time() - self._last_debug_time > 2.0:  # Log every 2 seconds
+                    self.logger.info(f"🧭 Navigation: target=({next_waypoint.position.x:.1f}, {next_waypoint.position.y:.1f}, {next_waypoint.position.z:.1f}), distance={distance:.2f}m")
+                    self._last_debug_time = time.time()
+            else:
+                self._last_debug_time = time.time()
     
     def check_waypoint_reached(self, waypoint: Waypoint) -> bool:
         """Vérifie si le waypoint a été atteint"""
