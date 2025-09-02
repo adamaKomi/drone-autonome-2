@@ -41,8 +41,13 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 
 # Message types
 from std_msgs.msg import String, Bool, Float64
-from std_msgs.srv import SetString
-from geometry_msgs.msg import Point
+from std_srvs.srv import SetBool, Trigger
+from geometry_msgs.msg import Point, PoseStamped
+import geometry_msgs.msg
+
+# Services personnalisés
+from drone_mission.srv import MissionControl, LoadMission, CreateMission
+from drone_mission.msg import MissionStatus
 
 
 class MissionState(Enum):
@@ -469,10 +474,63 @@ class MissionExecutor:
     def _call_interface_service(self, command: str) -> bool:
         """Appelle un service du nœud interface"""
         try:
-            # Placeholder - remplacer par vrai appel de service
-            self.logger.info(f"📡 Interface service: {command}")
-            time.sleep(0.5)  # Simulation
-            return True
+            if command == "ARM":
+                # Appel au service d'armement
+                from std_srvs.srv import SetBool
+                client = self.create_client(SetBool, '/drone_interface/arm')
+                if not client.wait_for_service(timeout_sec=5.0):
+                    self.logger.error("❌ Service /drone_interface/arm non disponible")
+                    return False
+                
+                request = SetBool.Request()
+                request.data = True
+                future = client.call_async(request)
+                rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+                
+                if future.result() and future.result().success:
+                    self.logger.info("✅ Drone armé avec succès")
+                    return True
+                else:
+                    self.logger.error("❌ Échec armement drone")
+                    return False
+                    
+            elif command == "DISARM":
+                # Appel au service de désarmement
+                from std_srvs.srv import SetBool
+                client = self.create_client(SetBool, '/drone_interface/disarm')
+                if not client.wait_for_service(timeout_sec=5.0):
+                    return False
+                    
+                request = SetBool.Request()
+                request.data = True
+                future = client.call_async(request)
+                rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+                
+                return future.result() and future.result().success
+                
+            elif command.startswith("TAKEOFF:"):
+                altitude = float(command.split(":")[1])
+                # Utiliser le service de navigation pour takeoff
+                return self._call_navigation_service("set_position", f"0:0:{altitude}:0")
+                
+            elif command.startswith("SET_MODE:"):
+                mode = command.split(":")[1]
+                from drone_interface.srv import SetFlightMode
+                client = self.create_client(SetFlightMode, '/drone_interface/set_flight_mode')
+                if not client.wait_for_service(timeout_sec=5.0):
+                    return False
+                    
+                request = SetFlightMode.Request()
+                request.mode = mode
+                future = client.call_async(request)
+                rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+                
+                return future.result() and future.result().success
+                
+            else:
+                self.logger.error(f"❌ Commande interface inconnue: {command}")
+                return False
+                
         except Exception as e:
             self.logger.error(f"❌ Erreur service interface: {e}")
             return False
@@ -480,13 +538,115 @@ class MissionExecutor:
     def _call_navigation_service(self, service_type: str, command: str) -> bool:
         """Appelle un service du nœud navigation"""
         try:
-            # Placeholder - remplacer par vrai appel de service
-            self.logger.info(f"🧭 Navigation {service_type}: {command}")
-            time.sleep(0.5)  # Simulation
-            return True
+            if service_type == "goto" or service_type == "set_position":
+                # Parse coordinates: "x:y:z:yaw"
+                coords = command.split(":")
+                x, y, z = float(coords[0]), float(coords[1]), float(coords[2])
+                yaw = float(coords[3]) if len(coords) > 3 else 0.0
+                
+                from drone_navigation.srv import SetPosition
+                client = self.create_client(SetPosition, '/navigation/set_position')
+                if not client.wait_for_service(timeout_sec=5.0):
+                    self.logger.error("❌ Service /navigation/set_position non disponible")
+                    return False
+                
+                request = SetPosition.Request()
+                request.position.x = x
+                request.position.y = y
+                request.position.z = z
+                request.yaw = yaw
+                
+                future = client.call_async(request)
+                rclpy.spin_until_future_complete(self, future, timeout_sec=15.0)
+                
+                if future.result() and future.result().success:
+                    self.logger.info(f"✅ Navigation vers ({x:.1f}, {y:.1f}, {z:.1f}) démarrée")
+                    
+                    # Attendre que le drone atteigne la position (avec timeout)
+                    return self._wait_for_position_reached(x, y, z, tolerance=1.0, timeout=30.0)
+                else:
+                    self.logger.error("❌ Échec commande de navigation")
+                    return False
+                    
+            elif service_type == "add_waypoint":
+                # Parse waypoint: "x:y:z:yaw:tolerance:hold_time:max_vel"
+                parts = command.split(":")
+                x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+                
+                from drone_navigation.srv import AddWaypoint
+                client = self.create_client(AddWaypoint, '/navigation/set_waypoints')
+                if not client.wait_for_service(timeout_sec=5.0):
+                    return False
+                
+                request = AddWaypoint.Request()
+                waypoint = geometry_msgs.msg.Point()
+                waypoint.x = x
+                waypoint.y = y  
+                waypoint.z = z
+                request.waypoints = [waypoint]
+                
+                future = client.call_async(request)
+                rclpy.spin_until_future_complete(self, future, timeout_sec=10.0)
+                
+                return future.result() and future.result().success
+                
+            else:
+                self.logger.error(f"❌ Type de service navigation inconnu: {service_type}")
+                return False
+                
         except Exception as e:
             self.logger.error(f"❌ Erreur service navigation: {e}")
             return False
+            
+    def _wait_for_position_reached(self, target_x: float, target_y: float, target_z: float, 
+                                  tolerance: float = 1.0, timeout: float = 30.0) -> bool:
+        """Attend que le drone atteigne la position cible"""
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout and not self.stop_execution:
+            # Obtenir la position actuelle depuis /mavros/local_position/pose
+            try:
+                from geometry_msgs.msg import PoseStamped
+                import rclpy
+                
+                # Créer un subscriber temporaire pour obtenir la position
+                current_pos = None
+                
+                def pos_callback(msg):
+                    nonlocal current_pos
+                    current_pos = msg
+                
+                temp_sub = self.create_subscription(
+                    PoseStamped, '/mavros/local_position/pose', pos_callback, 1
+                )
+                
+                # Attendre de recevoir la position
+                start_wait = time.time()
+                while current_pos is None and time.time() - start_wait < 2.0:
+                    rclpy.spin_once(self, timeout_sec=0.1)
+                
+                self.destroy_subscription(temp_sub)
+                
+                if current_pos:
+                    distance = math.sqrt(
+                        (target_x - current_pos.pose.position.x)**2 +
+                        (target_y - current_pos.pose.position.y)**2 +
+                        (target_z - current_pos.pose.position.z)**2
+                    )
+                    
+                    if distance <= tolerance:
+                        self.logger.info(f"✅ Position cible atteinte (distance: {distance:.2f}m)")
+                        return True
+                        
+                    self.logger.debug(f"🧭 Distance à la cible: {distance:.2f}m")
+                    
+            except Exception as e:
+                self.logger.error(f"❌ Erreur vérification position: {e}")
+                
+            time.sleep(0.5)
+            
+        self.logger.warn(f"⚠️ Timeout atteint pour atteindre position ({target_x}, {target_y}, {target_z})")
+        return False
             
     def add_mission_callback(self, callback):
         """Ajoute un callback pour les événements de mission"""
@@ -597,14 +757,14 @@ class MissionNode(Node):
         
     def _setup_publishers(self):
         """Configure les publishers"""
-        # État de la mission
+        # État de la mission avec message personnalisé
         self.mission_status_pub = self.create_publisher(
-            String,
+            MissionStatus,
             '/drone/mission/status',
             self.qos_critical
         )
         
-        # Progression de mission
+        # Progression de mission (format simple)
         self.mission_progress_pub = self.create_publisher(
             String,
             '/drone/mission/progress',
@@ -613,23 +773,23 @@ class MissionNode(Node):
         
     def _setup_services(self):
         """Configure les services"""
-        # Service de contrôle de mission
+        # Service de contrôle de mission  
         self.mission_control_service = self.create_service(
-            SetString,
+            MissionControl,
             '/drone/mission/control',
             self._handle_mission_control
         )
         
         # Service de chargement de mission
         self.load_mission_service = self.create_service(
-            SetString,
+            LoadMission,
             '/drone/mission/load',
             self._handle_load_mission
         )
         
         # Service de création de mission
         self.create_mission_service = self.create_service(
-            SetString,
+            CreateMission,
             '/drone/mission/create',
             self._handle_create_mission
         )
@@ -659,40 +819,40 @@ class MissionNode(Node):
     def _handle_mission_control(self, request, response):
         """Gère le contrôle de mission"""
         try:
-            command = request.data.upper()
+            command = request.command.upper()
             
             if command == "START":
                 success = self.mission_executor.start_mission()
-                response.data = "SUCCESS:Mission démarrée" if success else "ERROR:Impossible de démarrer"
+                response.message = "Mission démarrée" if success else "Impossible de démarrer"
                 response.success = success
                 
             elif command == "PAUSE":
                 self.mission_executor.pause_mission()
-                response.data = "SUCCESS:Mission en pause"
+                response.message = "Mission en pause"
                 response.success = True
                 
             elif command == "RESUME":
                 self.mission_executor.resume_mission()
-                response.data = "SUCCESS:Mission reprise"
+                response.message = "Mission reprise"
                 response.success = True
                 
             elif command == "STOP":
                 self.mission_executor.stop_mission()
-                response.data = "SUCCESS:Mission arrêtée"
+                response.message = "Mission arrêtée"
                 response.success = True
                 
             elif command == "EMERGENCY":
                 self.mission_executor.emergency_abort()
-                response.data = "SUCCESS:Abandon d'urgence"
+                response.message = "Abandon d'urgence"
                 response.success = True
                 
             else:
-                response.data = f"ERROR:Commande inconnue: {command}"
+                response.message = f"Commande inconnue: {command}"
                 response.success = False
                 
         except Exception as e:
             self.logger.error(f"❌ Erreur mission_control: {e}")
-            response.data = f"ERROR:{str(e)}"
+            response.message = f"ERREUR: {str(e)}"
             response.success = False
             
         return response
@@ -700,12 +860,13 @@ class MissionNode(Node):
     def _handle_load_mission(self, request, response):
         """Gère le chargement de mission"""
         try:
-            mission_name = request.data
+            mission_name = request.mission_name
             mission_file = os.path.join(self.mission_directory, f"{mission_name}.json")
             
             if not os.path.exists(mission_file):
-                response.data = f"ERROR:Mission '{mission_name}' non trouvée"
+                response.message = f"Mission '{mission_name}' non trouvée"
                 response.success = False
+                response.mission_id = ""
                 return response
                 
             # Charger la mission depuis le fichier
@@ -716,24 +877,31 @@ class MissionNode(Node):
             success = self.mission_executor.load_mission(mission)
             
             if success:
-                response.data = f"SUCCESS:Mission '{mission_name}' chargée"
+                response.message = f"Mission '{mission_name}' chargée"
                 response.success = True
+                response.mission_id = mission.id
             else:
-                response.data = f"ERROR:Impossible de charger '{mission_name}'"
+                response.message = f"Impossible de charger '{mission_name}'"
                 response.success = False
+                response.mission_id = ""
                 
         except Exception as e:
             self.logger.error(f"❌ Erreur load_mission: {e}")
-            response.data = f"ERROR:{str(e)}"
+            response.message = f"ERREUR: {str(e)}"
             response.success = False
+            response.mission_id = ""
             
         return response
         
     def _handle_create_mission(self, request, response):
         """Gère la création de mission"""
         try:
-            # Format JSON simple pour créer une mission
-            mission_data = json.loads(request.data)
+            # Créer mission depuis les paramètres
+            mission_data = {
+                "name": request.mission_name,
+                "description": request.description,
+                "tasks": json.loads(request.tasks_json)
+            }
             
             mission = self._create_mission_from_dict(mission_data)
             
@@ -742,13 +910,15 @@ class MissionNode(Node):
             with open(mission_file, 'w') as f:
                 json.dump(self._mission_to_dict(mission), f, indent=2)
                 
-            response.data = f"SUCCESS:Mission '{mission.name}' créée et sauvegardée"
+            response.message = f"Mission '{mission.name}' créée et sauvegardée"
             response.success = True
+            response.mission_id = mission.id
             
         except Exception as e:
             self.logger.error(f"❌ Erreur create_mission: {e}")
-            response.data = f"ERROR:{str(e)}"
+            response.message = f"ERREUR: {str(e)}"
             response.success = False
+            response.mission_id = ""
             
         return response
         
@@ -791,14 +961,47 @@ class MissionNode(Node):
         """Publie l'état de la mission"""
         status = self.mission_executor.get_mission_status()
         
-        status_msg = String()
-        status_msg.data = json.dumps(status)
+        # Message MissionStatus personnalisé
+        status_msg = MissionStatus()
+        
+        if status["state"] != "NO_MISSION":
+            mission = self.mission_executor.current_mission
+            status_msg.mission_id = status["mission_id"]
+            status_msg.mission_name = status["mission_name"]
+            status_msg.state = status["state"]
+            status_msg.current_task_index = mission.current_task_index if mission else 0
+            status_msg.total_tasks = len(mission.tasks) if mission else 0
+            status_msg.current_task_type = status.get("current_task", "")
+            status_msg.current_task_status = status.get("current_task_status", "")
+            
+            # Calcul du pourcentage de progression
+            if status_msg.total_tasks > 0:
+                status_msg.progress_percentage = (status_msg.current_task_index / status_msg.total_tasks) * 100.0
+            else:
+                status_msg.progress_percentage = 0.0
+                
+            # Temps écoulé
+            if mission and mission.started_at > 0:
+                status_msg.elapsed_time = time.time() - mission.started_at
+            else:
+                status_msg.elapsed_time = 0.0
+        else:
+            status_msg.mission_id = ""
+            status_msg.mission_name = ""
+            status_msg.state = "NO_MISSION"
+            status_msg.current_task_index = 0
+            status_msg.total_tasks = 0
+            status_msg.current_task_type = ""
+            status_msg.current_task_status = ""
+            status_msg.progress_percentage = 0.0
+            status_msg.elapsed_time = 0.0
+            
         self.mission_status_pub.publish(status_msg)
         
-        # Publisher le progrès séparément
+        # Publisher le progrès en format simple
         if status["state"] != "NO_MISSION":
             progress_msg = String()
-            progress_msg.data = f"{status['state']}:{status['progress']}"
+            progress_msg.data = f"{status['state']}:{status['progress']}:{status_msg.progress_percentage:.1f}%"
             self.mission_progress_pub.publish(progress_msg)
             
     def _print_node_info(self):

@@ -1,0 +1,7 @@
+# Service pour charger une mission depuis un fichier
+
+string mission_name
+---
+bool success
+string message
+string mission_id
