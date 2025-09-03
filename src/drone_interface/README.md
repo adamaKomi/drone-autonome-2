@@ -1,425 +1,586 @@
-# Drone Interface - Système de Contrôle ArduPilot
+# Drone Interface Package
 
-## 🚁 Description
+[![ROS2](https://img.shields.io/badge/ROS2-Humble-blue.svg)](https://docs.ros.org/en/humble/)
+[![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Ce package ROS2 fournit une interface complète et modulaire pour contrôler un drone ArduPilot via MAVROS. Il est conçu pour fonctionner avec le simulateur SITL (Software In The Loop) d'ArduPilot et peut être adapté pour un drone physique.
+Interface ROS2 robuste et modulaire pour le contrôle de drones ArduPilot via MAVROS avec gestion avancée de la sécurité et surveillance système.
 
-## 🏗️ Architecture
+## 🚀 Caractéristiques
 
-### Modules Principaux
+- **Architecture modulaire** : Séparation claire des responsabilités (Safety, State, Health)
+- **Lifecycle management** : Gestion complète des états ROS2 Lifecycle
+- **Sécurité avancée** : Vérifications pré-vol, monitoring continu, gestion d'urgence
+- **Threading sécurisé** : Gestion thread-safe avec timeouts appropriés
+- **Diagnostics intégrés** : Surveillance système et reporting détaillé
+- **Outils CLI** : Suite d'outils en ligne de commande pour opérations courantes
+- **Configuration flexible** : Paramètres YAML pour adaptation aux besoins
 
-1. **StateManager** - Gestion de l'état du drone
-2. **SafetyManager** - Vérifications de sécurité
-3. **ArmingManager** - Armement/désarmement
-4. **ModeManager** - Gestion des modes de vol
-5. **PositionController** - Contrôle de position
-6. **TakeoffLandingManager** - Décollage/atterrissage
-7. **MissionExecutor** - Exécution de missions
-
-### Structure des Fichiers
+## 📁 Structure du Package
 
 ```
 drone_interface/
-├── interface_node.py          # Nœud principal
-├── config.py                  # Configuration centralisée
-├── drone_examples.py          # Exemples et missions
-└── README.md                  # Documentation
+├── drone_interface/                 # Package Python principal
+│   ├── __init__.py
+│   ├── interface_node.py           # Nœud principal
+│   ├── safety_manager.py           # Gestionnaire de sécurité
+│   ├── state_manager.py            # Gestionnaire d'état
+│   ├── health_monitor.py           # Moniteur de santé
+│   └── tools/                      # Outils CLI
+│       ├── __init__.py
+│       ├── diagnostics.py
+│       ├── safety_check.py
+│       ├── arm_drone.py
+│       └── status.py
+├── launch/                         # Fichiers de lancement
+│   └── drone_interface_launch.py
+├── config/                         # Fichiers de configuration
+│   ├── default_params.yaml
+│   └── safety_limits.yaml
+├── test/                           # Tests
+│   ├── test_interface.py
+│   └── test_safety.py
+├── scripts/                        # Scripts utilitaires
+│   └── setup_environment.py
+├── resource/                       # Ressources du package
+│   └── drone_interface
+├── setup.py                       # Configuration Python
+├── package.xml                    # Métadonnées ROS2
+└── README.md                      # Documentation
 ```
 
-## 🚀 Installation et Configuration
+## 🛠️ Installation
 
 ### Prérequis
 
-1. **ROS2 Humble/Iron/Rolling**
-2. **MAVROS** installé et configuré
-3. **ArduPilot SITL** pour la simulation
+- ROS2 Humble
+- Python 3.8+
+- MAVROS
+- ArduPilot SITL (pour simulation)
+
+### Installation des dépendances
 
 ```bash
-# Installer MAVROS
+# Dépendances ROS2
 sudo apt install ros-humble-mavros ros-humble-mavros-extras
 
-# Installer les dépendances GeographicLib
-sudo /opt/ros/humble/lib/mavros/install_geographiclib_datasets.sh
-
-# Installer ArduPilot SITL
-git clone --recurse-submodules https://github.com/ArduPilot/ardupilot.git
-cd ardupilot
-./Tools/environment_install/install-prereqs-ubuntu.sh -y
-. ~/.profile
+# Dépendances Python
+pip install psutil pyyaml
 ```
 
-### Installation du Package
+### Compilation
 
 ```bash
-# Aller dans votre workspace ROS2
-cd ~/ros2_ws/src
-
-# Le package est déjà présent dans drone_interface/
-# Compiler le workspace
 cd ~/ros2_ws
 colcon build --packages-select drone_interface
-
-# Sourcer l'environnement
 source install/setup.bash
 ```
 
-## 🎮 Utilisation
+## 🚁 Utilisation
 
-### 1. Démarrage du Simulateur SITL
-
-```bash
-# Terminal 1: Démarrer ArduPilot SITL
-sim_vehicle.py -v ArduCopter --console --map --out=127.0.0.1:14550
-```
-
-### 2. Démarrage de MAVROS
+### 1. Démarrage du système
 
 ```bash
-# Terminal 2: Démarrer MAVROS
+# Terminal 1: Lancer MAVROS
 ros2 launch mavros apm.launch fcu_url:=udp://127.0.0.1:14550@14555
+
+# Terminal 2: Lancer l'interface drone
+ros2 launch drone_interface drone_interface_launch.py
+
+# Terminal 3: Configurer et activer le nœud
+ros2 lifecycle set /drone_interface configure
+ros2 lifecycle set /drone_interface activate
 ```
 
-### 3. Lancement du Nœud d'Interface
+### 2. Utilisation des outils CLI
 
 ```bash
-# Terminal 3: Lancer l'interface drone
-ros2 run drone_interface interface_node
+# Vérification de statut
+ros2 run drone_interface drone_status
+
+# Vérification de sécurité
+ros2 run drone_interface drone_safety_check
+
+# Armement sécurisé
+ros2 run drone_interface drone_arm
+
+# Diagnostics système
+ros2 run drone_interface drone_diagnostics
+
+# Statut en temps réel
+ros2 run drone_interface drone_status --continuous
 ```
 
-### 4. Commandes de Base
+### 3. Services disponibles
 
-```bash
-# Vérifier l'état
-ros2 param set /drone_interface action "STATUS"
+| Service | Type | Description |
+|---------|------|-------------|
+| `/drone/arm` | `std_srvs/Trigger` | Armement sécurisé |
+| `/drone/disarm` | `std_srvs/Trigger` | Désarmement |
+| `/drone/set_mode` | `mavros_msgs/SetMode` | Changement de mode |
+| `/drone/safety_check` | `std_srvs/Trigger` | Vérification sécurité |
+| `/drone/health_check` | `std_srvs/Trigger` | État de santé |
+| `/drone/emergency_stop` | `std_srvs/Trigger` | Arrêt d'urgence |
 
-# Armer le drone
-ros2 param set /drone_interface action "ARM"
+### 4. Topics publiés
 
-# Passer en mode GUIDED
-ros2 param set /drone_interface action "GUIDED"
-
-# Décoller à 3m
-ros2 param set /drone_interface altitude 3.0
-ros2 param set /drone_interface action "TAKEOFF"
-
-# Aller à une position
-ros2 param set /drone_interface x 5.0
-ros2 param set /drone_interface y 3.0
-ros2 param set /drone_interface z 2.0
-ros2 param set /drone_interface action "POSITION"
-
-# Maintenir la position actuelle
-ros2 param set /drone_interface action "HOLD"
-
-# Atterrir
-ros2 param set /drone_interface action "LAND"
-
-# Désarmer
-ros2 param set /drone_interface action "DISARM"
-```
-
-### 5. Commandes Avancées
-
-```bash
-# Forcer l'armement (ignore les vérifications de sécurité)
-ros2 param set /drone_interface action "FORCE_ARM"
-
-# Changer de mode de vol
-ros2 param set /drone_interface mode "LOITER"
-ros2 param set /drone_interface action "MODE"
-
-# Procédure d'urgence (RTL ou LAND)
-ros2 param set /drone_interface action "EMERGENCY"
-
-# Arrêter les setpoints de position
-ros2 param set /drone_interface action "STOP_SETPOINTS"
-```
-
-## 🎯 Missions Prédéfinies
-
-### Lancer des Missions d'Exemple
-
-```bash
-# Lister les missions disponibles
-ros2 run drone_interface drone_examples --list-missions
-
-# Exécuter une mission simple
-ros2 run drone_interface drone_examples --mission basic_flight
-
-# Exécuter un motif carré
-ros2 run drone_interface drone_examples --mission square_pattern
-
-# Mission en triangle
-ros2 run drone_interface drone_examples --mission triangle_pattern
-
-# Vol en cercle
-ros2 run drone_interface drone_examples --mission circle_pattern
-```
-
-### Missions Disponibles
-
-| Mission | Description | Altitude | Durée |
-|---------|-------------|----------|-------|
-| `basic_flight` | Vol stationnaire simple | 3m | 1min |
-| `square_pattern` | Motif carré 10x10m | 3m | 2min |
-| `triangle_pattern` | Triangle équilatéral | 4m | 2min |
-| `circle_pattern` | Cercle de 8m de rayon | 5m | 3min |
-| `altitude_test` | Test de montée/descente | 2-8m | 3min |
-| `perimeter_inspection` | Inspection périmètre 20x15m | 6m | 10min |
-| `speed_test` | Test de déplacement rapide | 4m | 5min |
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/drone/status` | `std_msgs/String` | État détaillé du drone (JSON) |
+| `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | Diagnostics système |
+| `/drone/safety_status` | `std_msgs/String` | Événements de sécurité |
 
 ## ⚙️ Configuration
 
-### Profils de Configuration
+### Paramètres de sécurité
 
-Le système supporte plusieurs profils de configuration :
+Éditez `config/safety_limits.yaml` pour ajuster les limites :
 
-```bash
-# Configuration par défaut
-ros2 run drone_interface interface_node
-
-# Configuration pour simulation
-DRONE_CONFIG_PROFILE=simulation ros2 run drone_interface interface_node
-
-# Configuration conservatrice (sécurité maximale)
-DRONE_CONFIG_PROFILE=conservative ros2 run drone_interface interface_node
-
-# Configuration agressive (performance maximale)
-DRONE_CONFIG_PROFILE=aggressive ros2 run drone_interface interface_node
+```yaml
+safety:
+  min_battery_voltage: 10.5        # Tension minimale (V)
+  min_battery_percentage: 20.0     # Pourcentage minimal (%)
+  max_altitude: 120.0              # Altitude maximale (m)
+  min_gps_satellites: 6            # Satellites GPS minimaux
 ```
 
-### Variables d'Environnement
+### Paramètres de performance
+
+Configurez `config/default_params.yaml` :
+
+```yaml
+performance:
+  status_rate: 10.0                # Fréquence publication statut (Hz)
+  health_check_rate: 1.0           # Fréquence vérifications santé (Hz)
+  diagnostics_rate: 0.5            # Fréquence diagnostics (Hz)
+```
+
+## 🔒 Système de Sécurité
+
+### Vérifications pré-armement
+
+- Connexion MAVROS établie
+- Fix GPS avec qualité suffisante
+- Niveau de batterie acceptable
+- Mode GUIDED activé
+- Communication récente avec l'autopilot
+
+### Monitoring en vol
+
+- Surveillance batterie avec prédiction de tendance
+- Détection perte GPS
+- Contrôle altitude maximale
+- Surveillance communication
+- Détection pannes multiples
+
+### Actions d'urgence
+
+- Désarmement automatique en cas critique
+- Atterrissage d'urgence batterie faible
+- Return-to-Launch (RTL) en cas de perte communication
+
+## 🧪 Tests
 
 ```bash
-# Personnaliser la configuration via variables d'environnement
-export DRONE_MIN_BATTERY_VOLTAGE=11.0
-export DRONE_MAX_ALTITUDE=50.0
-export DRONE_GEOFENCE_RADIUS=100.0
-export DRONE_TAKEOFF_ALTITUDE=3.0
-export DRONE_DISABLE_SAFETY=false
-export MAVROS_NAMESPACE=mavros
+# Tests unitaires
+cd ~/ros2_ws
+colcon test --packages-select drone_interface
 
-# Puis lancer le nœud
-ros2 run drone_interface interface_node
+# Tests de sécurité spécifiques
+python3 src/drone_interface/test/test_safety.py
+
+# Tests d'intégration
+python3 src/drone_interface/test/test_interface.py
+```
+
+## 📊 Monitoring et Diagnostics
+
+### Surveillance système
+
+```bash
+# Surveillance continue
+ros2 run drone_interface drone_diagnostics
+
+# Vérification ponctuelle
+ros2 service call /drone/health_check std_srvs/srv/Trigger
+```
+
+### Logs
+
+Les logs sont disponibles dans `/tmp/drone_logs/` avec séparation par composant :
+
+- `interface/` : Logs du nœud principal
+- `safety/` : Logs de sécurité
+- `diagnostics/` : Logs de diagnostic
+
+## 🛠️ Développement
+
+### Configuration environnement
+
+```bash
+# Configuration développement
+python3 scripts/setup_environment.py --dev
+
+# Configuration production
+sudo python3 scripts/setup_environment.py --prod
+```
+
+### Architecture
+
+Le package suit une architecture modulaire :
+
+- **SafetyManager** : Gestion des vérifications de sécurité
+- **StateManager** : Maintien de l'état du drone
+- **HealthMonitor** : Surveillance de la santé système
+- **DroneInterface** : Nœud principal avec lifecycle management
+
+## 🚨 Dépannage
+
+### Problèmes courants
+
+**Service MAVROS non disponible**
+```bash
+# Vérifier MAVROS
+ros2 topic list | grep mavros
+ros2 service list | grep mavros
+```
+
+**Échec d'armement**
+```bash
+# Vérifier sécurité
+ros2 run drone_interface drone_safety_check
+```
+
+**Perte de communication**
+```bash
+# Vérifier connexion
+ros2 topic echo /mavros/state
+```
+
+## 📝 Changelog
+
+### Version 3.0.0
+- Architecture modulaire complète
+- Système de sécurité avancé
+- Outils CLI intégrés
+- Lifecycle management
+- Tests complets
+
+## 👥 Auteurs
+
+- **Adama Komi** - *Développement initial* - [adamaKomi](https://github.com/adamaKomi)
+- **Détection de Tendances** : Analyse prédictive de l'état de la batterie
+- **Niveaux de Sécurité** : Classification des risques (SAFE/WARNING/CRITICAL/EMERGENCY)
+
+### Outils CLI Intégrés
+- **drone_status** : Affichage de l'état du drone en temps réel
+- **drone_safety_check** : Vérification complète de sécurité
+- **drone_arm** : Armement sécurisé avec vérifications
+- **drone_diagnostics** : Diagnostics système détaillés
+
+## 📁 Structure du Package
+
+```
+drone_interface/
+├── drone_interface/                 # Package Python principal
+│   ├── __init__.py
+│   ├── interface_node.py           # Nœud principal
+│   ├── safety_manager.py           # Gestionnaire de sécurité
+│   ├── state_manager.py            # Gestionnaire d'état
+│   ├── health_monitor.py           # Moniteur de santé
+│   └── tools/                      # Outils CLI
+│       ├── __init__.py
+│       ├── diagnostics.py
+│       ├── safety_check.py
+│       ├── arm_drone.py
+│       └── status.py
+├── launch/                         # Fichiers de lancement
+│   └── drone_interface_launch.py
+├── config/                         # Fichiers de configuration
+│   ├── default_params.yaml
+│   └── safety_limits.yaml
+├── test/                           # Tests
+│   ├── test_interface.py
+│   └── test_safety.py
+├── scripts/                        # Scripts utilitaires
+│   └── setup_environment.py
+├── resource/                       # Ressources du package
+│   └── drone_interface            # Fichier marqueur (vide)
+├── setup.py                       # Configuration Python
+├── package.xml                    # Métadonnées ROS2
+└── README.md                      # Documentation
+```
+
+## 🛠️ Installation
+
+### Prérequis
+
+- ROS2 Humble
+- Python 3.8+
+- MAVROS
+- ArduPilot SITL ou drone physique
+
+### Installation des Dépendances
+
+```bash
+# Dépendances système
+sudo apt update
+sudo apt install ros-humble-mavros ros-humble-mavros-extras
+
+# Dépendances Python
+pip install psutil pyyaml
+```
+
+### Compilation
+
+```bash
+cd ~/ros2_ws
+colcon build --packages-select drone_interface
+source install/setup.bash
+```
+
+### Configuration Automatique
+
+```bash
+# Configuration environnement de développement
+ros2 run drone_interface setup_environment --dev
+
+# Configuration environnement de production
+ros2 run drone_interface setup_environment --prod
+```
+
+## 🚁 Utilisation
+
+### Démarrage du Système
+
+1. **Lancement de MAVROS** :
+```bash
+ros2 launch mavros apm.launch fcu_url:=udp://127.0.0.1:14550@14555
+```
+
+2. **Lancement de l'Interface Drone** :
+```bash
+ros2 launch drone_interface drone_interface_launch.py
+```
+
+3. **Configuration du Nœud** :
+```bash
+ros2 lifecycle set /drone_interface configure
+ros2 lifecycle set /drone_interface activate
+```
+
+### Utilisation des Outils CLI
+
+#### Vérification de l'État
+```bash
+# Affichage unique
+ros2 run drone_interface drone_status
+
+# Affichage continu
+ros2 run drone_interface drone_status --continuous
+```
+
+#### Vérification de Sécurité
+```bash
+ros2 run drone_interface drone_safety_check
+```
+
+#### Armement Sécurisé
+```bash
+# Armement avec vérifications
+ros2 run drone_interface drone_arm
+
+# Armement forcé (non recommandé)
+ros2 run drone_interface drone_arm --force
+```
+
+#### Diagnostics Système
+```bash
+ros2 run drone_interface drone_diagnostics
+```
+
+### Services Disponibles
+
+| Service | Type | Description |
+|---------|------|-------------|
+| `/drone/arm` | `std_srvs/Trigger` | Armement sécurisé |
+| `/drone/disarm` | `std_srvs/Trigger` | Désarmement |
+| `/drone/set_mode` | `mavros_msgs/SetMode` | Changement de mode |
+| `/drone/safety_check` | `std_srvs/Trigger` | Vérification sécurité |
+| `/drone/health_check` | `std_srvs/Trigger` | État de santé |
+| `/drone/emergency_stop` | `std_srvs/Trigger` | Arrêt d'urgence |
+
+### Topics Publiés
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/drone/status` | `std_msgs/String` | État détaillé (JSON) |
+| `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | Diagnostics système |
+| `/drone/safety_status` | `std_msgs/String` | Événements sécurité |
+
+## ⚙️ Configuration
+
+### Paramètres Principaux
+
+Le fichier `config/default_params.yaml` contient tous les paramètres configurables :
+
+```yaml
+# Sécurité
+safety:
+  min_battery_voltage: 10.5
+  min_battery_percentage: 20.0
+  max_altitude: 120.0
+  min_gps_satellites: 6
+
+# Communication
+communication:
+  heartbeat_timeout: 5.0
+  service_timeout: 30.0
+  retry_attempts: 3
+
+# Performance
+performance:
+  status_rate: 10.0
+  health_check_rate: 1.0
+  diagnostics_rate: 0.5
+```
+
+### Limites de Sécurité
+
+Le fichier `config/safety_limits.yaml` définit les limites critiques :
+
+```yaml
+critical_limits:
+  battery:
+    voltage_min: 9.5
+    percentage_min: 10.0
+  altitude:
+    max_absolute: 150.0
+  navigation:
+    max_speed_horizontal: 20.0
 ```
 
 ## 🧪 Tests
 
-### Lancer les Tests Unitaires
+### Exécution des Tests
 
+```bash
+# Tests unitaires
+python3 -m pytest test/test_interface.py -v
 
+# Tests de sécurité
+python3 -m pytest test/test_safety.py -v
 
-### Tests de Performance
+# Tests avec couverture
+python3 -m pytest --cov=drone_interface test/ --cov-report=html
+```
 
-Les tests incluent :
-- ✅ Tests des énumérations et structures de données
-- ✅ Tests du SafetyManager
-- ✅ Tests du StateManager
-- ✅ Tests du PositionController
-- ✅ Tests d'intégration entre modules
-- ✅ Tests de performance
+### Tests d'Intégration
 
-## 🛡️ Sécurité
+```bash
+# Test complet avec MAVROS
+ros2 launch drone_interface test_integration.launch.py
+```
+
+## 📊 Monitoring et Diagnostics
+
+### Surveillance en Temps Réel
+
+```bash
+# Monitoring continu
+watch -n 1 "ros2 topic echo /drone/status --once"
+
+# Diagnostics ROS2
+ros2 topic echo /diagnostics
+```
+
+### Logs et Debugging
+
+```bash
+# Logs détaillés
+ros2 launch drone_interface drone_interface_launch.py log_level:=DEBUG
+
+# Visualisation des logs
+tail -f /tmp/drone_logs/interface/drone_interface.log
+```
+
+## 🔧 Développement
+
+### Architecture
+
+Le package suit une architecture modulaire avec séparation des responsabilités :
+
+- **SafetyManager** : Logique de sécurité et vérifications
+- **StateManager** : Gestion de l'état du drone
+- **HealthMonitor** : Surveillance de la santé système
+- **DroneInterface** : Nœud principal avec lifecycle management
+
+### Contribution
+
+1. Fork le repository
+2. Créer une branche feature (`git checkout -b feature/nouvelle-fonctionnalite`)
+3. Commiter les changements (`git commit -am 'Ajout nouvelle fonctionnalité'`)
+4. Pousser vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
+5. Créer une Pull Request
+
+### Standards de Code
+
+- **PEP 8** : Respect des conventions Python
+- **Type Hints** : Utilisation obligatoire des annotations de type
+- **Documentation** : Docstrings pour toutes les fonctions publiques
+- **Tests** : Couverture minimale de 80%
+
+## 🚨 Sécurité
 
 ### Vérifications Automatiques
 
 Le système effectue automatiquement :
-- ✅ Vérification de la connexion MAVROS
-- ✅ Vérification du fix GPS et nombre de satellites
-- ✅ Vérification du niveau de batterie
-- ✅ Surveillance de l'altitude maximum
-- ✅ Géofence de sécurité
-- ✅ Surveillance continue en vol
+- Validation de la connexion MAVROS
+- Vérification du niveau de batterie
+- Contrôle de la qualité GPS
+- Surveillance de l'altitude
+- Détection de perte de communication
 
-### Paramètres de Sécurité par Défaut
+### Procédures d'Urgence
 
-```python
-min_battery_voltage = 10.5V      # Voltage minimum
-min_gps_satellites = 6           # Satellites minimum
-max_altitude = 120.0m            # Altitude maximum
-geofence_radius = 100.0m         # Rayon de sécurité
-critical_battery = 20%           # Seuil batterie critique
-```
+En cas de problème critique :
+1. **Arrêt d'urgence** : `ros2 service call /drone/emergency_stop std_srvs/srv/Trigger`
+2. **Désarmement forcé** : Le système peut désarmer automatiquement
+3. **Mode RTL** : Retour automatique à la base
 
-### Procédure d'Urgence
+## 📚 Documentation Supplémentaire
 
-En cas de problème, le système peut :
-1. Passer automatiquement en mode RTL (Return to Launch)
-2. Si RTL échoue, passer en mode LAND
-3. Désarmer le drone si nécessaire
+- [Guide de Déploiement](docs/deployment.md)
+- [Configuration Avancée](docs/advanced_config.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [API Reference](docs/api_reference.md)
 
-## 📊 Surveillance et Monitoring
+## 📝 Changelog
 
-### Informations Affichées
+### Version 3.0.0 (2025-09-03)
+- Refactorisation complète avec architecture modulaire
+- Ajout du système de sécurité avancé
+- Implémentation des outils CLI
+- Lifecycle management complet
+- Tests exhaustifs
 
-Le système affiche périodiquement :
-- 📡 État de connexion MAVROS
-- 🔧 État d'armement
-- 🎮 Mode de vol actuel
-- 📍 Position (x, y, z)
-- 🔋 Voltage et pourcentage batterie
-- 🛰️ État GPS et satellites
+### Version 2.x
+- Voir [CHANGELOG.md](CHANGELOG.md) pour l'historique complet
 
-### Topics ROS2 Utilisés
+## 📄 License
 
-```bash
-# Surveillance (subscribers)
-/mavros/state                           # État du drone
-/mavros/local_position/pose             # Position locale
-/mavros/local_position/velocity_local   # Vélocité
-/mavros/battery                         # État batterie
-/mavros/global_position/global          # Position GPS
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
 
-# Contrôle (publishers)
-/mavros/setpoint_position/local         # Setpoints de position
+## 👥 Équipe
 
-# Services utilisés
-/mavros/cmd/arming                      # Armement/désarmement
-/mavros/set_mode                        # Changement de mode
-/mavros/cmd/takeoff                     # Décollage
-/mavros/cmd/land                        # Atterrissage
-```
+- **Adama Komi** - Développeur principal - [GitHub](https://github.com/adamaKomi)
 
-## 🔧 Modes de Vol Supportés
+## 🆘 Support
 
-| Mode | Description | Usage |
-|------|-------------|-------|
-| `STABILIZE` | Stabilisation manuelle | Contrôle RC |
-| `GUIDED` | Mode guidé | Contrôle autonome |
-| `AUTO` | Mission automatique | Waypoints préprogrammés |
-| `LOITER` | Vol stationnaire | Maintien position GPS |
-| `RTL` | Retour au lancement | Urgence/fin de mission |
-| `LAND` | Atterrissage auto | Atterrissage contrôlé |
-| `ALT_HOLD` | Maintien altitude | Vol manuel avec altitude fixe |
-| `POSHOLD` | Maintien position | Vol manuel avec position fixe |
-
-## 🚨 Résolution des Problèmes
-
-### Problèmes Courants
-
-#### 1. "Service /mavros/cmd/arming non disponible"
-```bash
-# Vérifier que MAVROS fonctionne
-ros2 topic echo /mavros/state
-
-# Redémarrer MAVROS si nécessaire
-```
-
-#### 2. "GPS fix not available"
-```bash
-# En simulation, attendre quelques secondes
-# Vérifier les paramètres SITL si problème persiste
-```
-
-#### 3. "Drone not connected to flight controller"
-```bash
-# Vérifier la connexion SITL
-# Vérifier l'URL de connexion MAVROS
-```
-
-#### 4. Armement refusé
-```bash
-# Vérifier l'état avec STATUS
-ros2 param set /drone_interface action "STATUS"
-
-# Forcer l'armement si nécessaire (simulation uniquement)
-ros2 param set /drone_interface action "FORCE_ARM"
-```
-
-### Logs Utiles
-
-```bash
-# Voir les logs du nœud
-ros2 run drone_interface interface_node
-
-# Voir l'état MAVROS
-ros2 topic echo /mavros/state
-
-# Voir la position
-ros2 topic echo /mavros/local_position/pose
-```
-
-## 🔬 Développement
-
-### Structure du Code
-
-```
-interface_node.py:
-├── DroneInterface          # Nœud principal
-├── StateManager           # Gestion d'état
-├── SafetyManager          # Sécurité
-├── ArmingManager          # Armement
-├── ModeManager            # Modes de vol
-├── PositionController     # Contrôle position
-└── TakeoffLandingManager  # Décollage/atterrissage
-```
-
-### Ajouter une Nouvelle Fonctionnalité
-
-1. Créer un nouveau manager dans `interface_node.py`
-2. L'initialiser dans `DroneInterface.__init__()`
-3. Ajouter les commandes dans `_handle_action_command()`
-
-### Bonnes Pratiques
-
-- ✅ Toutes les opérations ont des timeouts
-- ✅ Gestion d'erreurs complète
-- ✅ Logs détaillés pour le débogage
-- ✅ Vérifications de sécurité systématiques
-- ✅ Architecture modulaire et testable
-- ✅ Configuration centralisée
-
-## 📚 API Reference
-
-### Commandes Principales
-
-| Commande | Paramètres | Description |
-|----------|------------|-------------|
-| `ARM` | - | Arme le drone avec vérifications |
-| `DISARM` | - | Désarme le drone |
-| `TAKEOFF` | `altitude` | Décollage automatisé |
-| `LAND` | - | Atterrissage automatisé |
-| `POSITION` | `x, y, z, yaw` | Va à une position |
-| `HOLD` | - | Maintient la position actuelle |
-| `MODE` | `mode` | Change le mode de vol |
-| `STATUS` | - | Affiche l'état détaillé |
-| `EMERGENCY` | - | Procédure d'urgence |
-
-### Exemples d'Utilisation en Python
-
-```python
-# Importer le module
-from drone_interface.interface_node import DroneInterface
-
-# Créer une instance
-drone = DroneInterface()
-
-# Utiliser les managers directement
-success, msg = drone.arming_manager.arm()
-success, msg = drone.mode_manager.set_mode("GUIDED")
-success = drone.position_controller.set_position(5.0, 3.0, 2.0)
-```
-
-## 📞 Support
-
-### Documentation Officielle
-
-- [ArduPilot SITL](https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html)
-- [MAVROS](http://wiki.ros.org/mavros)
-- [MAVLink](https://mavlink.io/en/)
-
-### Contribution
-
-1. Fork le projet
-2. Créer une branche feature
-3. Commiter les changements
-4. Pousser vers la branche
-5. Créer une Pull Request
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
+- **Issues** : [GitHub Issues](https://github.com/adamaKomi/drone-autonome-2/issues)
+- **Discussions** : [GitHub Discussions](https://github.com/adamaKomi/drone-autonome-2/discussions)
+- **Email** : adama.komi@example.com
 
 ---
 
-🚁 **Happy Flying!** 🚁
+⚡ **Développé avec ❤️ pour la communauté des drones autonomes**
