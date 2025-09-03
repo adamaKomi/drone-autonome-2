@@ -1,0 +1,232 @@
+# Drone Pollination System Configuration
+# Main configuration file for all system components
+
+# System-wide settings
+system:
+  name: "drone_pollination_system"
+  version: "1.0.0"
+  debug_mode: true
+  log_level: "info"
+  use_sim_time: true
+  
+# Drone interface configuration
+drone_interface:
+  safety:
+    min_battery_voltage: 10.5
+    min_battery_percentage: 20.0
+    min_gps_satellites: 6
+    max_altitude: 120.0
+    geofence_radius: 100.0
+    critical_battery_threshold: 20.0
+    low_battery_threshold: 30.0
+    enable_safety_checks: true
+    
+  mavros:
+    connection_timeout: 5.0
+    heartbeat_timeout: 3.0
+    command_timeout: 10.0
+    
+  control:
+    arm_timeout: 30.0
+    takeoff_timeout: 60.0
+    landing_timeout: 60.0
+    
+# Navigation system configuration
+navigation:
+  control:
+    update_rate: 20.0
+    position_tolerance: 0.5
+    yaw_tolerance: 0.1
+    max_velocity: 2.0
+    max_acceleration: 1.0
+    
+  limits:
+    max_altitude: 50.0
+    min_altitude: 0.5
+    max_distance_from_home: 200.0
+    
+  pid_position:
+    kp: 1.0
+    ki: 0.01
+    kd: 0.1
+    max_output: 2.0
+    min_output: -2.0
+    
+  pid_altitude:
+    kp: 1.5
+    ki: 0.01
+    kd: 0.2
+    max_output: 2.0
+    min_output: -2.0
+    
+  pid_yaw:
+    kp: 1.0
+    ki: 0.0
+    kd: 0.1
+    max_output: 1.0
+    min_output: -1.0
+
+# Vision system configuration
+vision:
+  detection:
+    confidence_threshold: 0.5
+    detection_rate: 10.0
+    min_flower_radius: 10
+    max_flower_radius: 100
+    
+  colors:
+    red:
+      - [0, 50, 50]    # Lower HSV bound
+      - [10, 255, 255] # Upper HSV bound
+      - [170, 50, 50]  # Second range for red
+      - [180, 255, 255]
+    yellow:
+      - [20, 50, 50]
+      - [30, 255, 255]
+    pink:
+      - [140, 50, 50]
+      - [170, 255, 255]
+    orange:
+      - [10, 50, 50]
+      - [20, 255, 255]
+      
+  camera:
+    frame_id: "camera_link"
+    topic: "/camera/image_raw"
+    compressed_topic: "/camera/image_raw/compressed"
+    
+  processing:
+    morphology_kernel_size: 5
+    contour_min_area: 100
+    circularity_threshold: 0.5
+
+# Mission system configuration
+mission:
+  execution:
+    default_timeout: 300.0
+    max_retries: 3
+    retry_delay: 2.0
+    enable_auto_recovery: true
+    max_recovery_attempts: 3
+    recovery_timeout: 60.0
+    
+  task_timeouts:
+    ARM: 30.0
+    DISARM: 10.0
+    TAKEOFF: 60.0
+    LAND: 60.0
+    GOTO: 120.0
+    WAYPOINT: 120.0
+    DETECT_FLOWERS: 30.0
+    APPROACH_FLOWER: 45.0
+    POLLINATE: 30.0
+    SET_MODE: 10.0
+    WAIT: 300.0
+    RTL: 180.0
+    
+  pollination:
+    default_approach_distance: 1.0
+    position_tolerance: 0.3
+    yaw_tolerance: 0.2
+    stabilization_time: 2.0
+    pollination_duration: 5.0
+    
+  waypoints:
+    default_altitude: 5.0
+    approach_altitude: 3.0
+    scanning_altitude: 4.0
+    cruise_speed: 1.5
+    approach_speed: 0.5
+
+# Data collection configuration
+data_collection:
+  storage:
+    base_directory: "~/ros2_ws/mission_data"
+    images_subdirectory: "images"
+    logs_subdirectory: "logs"
+    auto_create_directories: true
+    
+  collection:
+    gps_rate: 1.0
+    auto_start_on_arm: true
+    save_interval: 30.0
+    max_images_per_mission: 1000
+    
+  formats:
+    gps_format: "csv"
+    metadata_format: "json"
+    image_format: "jpg"
+    log_format: "txt"
+    
+  compression:
+    enable_image_compression: true
+    compression_quality: 85
+    
+# System monitoring configuration
+monitoring:
+  health_check:
+    interval: 5.0
+    component_timeout: 10.0
+    
+  heartbeat:
+    interval: 1.0
+    timeout: 5.0
+    
+  logging:
+    max_log_size: "100MB"
+    log_rotation: true
+    keep_logs: 7
+    
+  alerts:
+    battery_critical: 15.0
+    battery_low: 25.0
+    gps_min_satellites: 6
+    connection_timeout: 10.0
+
+# Development and testing
+development:
+  simulation:
+    enable_camera_simulator: true
+    enable_fake_gps: false
+    mock_flower_detections: false
+    
+  testing:
+    enable_test_mode: false
+    skip_safety_checks: false
+    fast_execution: false
+    
+  debugging:
+    publish_debug_topics: true
+    verbose_logging: true
+    save_debug_images: true
+
+# Environment-specific overrides
+environments:
+  production:
+    system:
+      debug_mode: false
+      log_level: "warn"
+    drone_interface:
+      safety:
+        enable_safety_checks: true
+    development:
+      simulation:
+        enable_camera_simulator: false
+        
+  testing:
+    mission:
+      execution:
+        default_timeout: 60.0
+        max_retries: 1
+    development:
+      testing:
+        enable_test_mode: true
+        fast_execution: true
+        
+  simulation:
+    system:
+      use_sim_time: true
+    development:
+      simulation:
+        enable_camera_simulator: true
+        enable_fake_gps: true

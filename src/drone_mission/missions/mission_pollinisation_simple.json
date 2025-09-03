@@ -1,0 +1,146 @@
+{
+  "id": "pollination_mission_001",
+  "name": "mission_pollinisation_simple",
+  "description": "Mission de pollinisation autonome : décollage, scan de zone, détection de fleurs, approche et pollinisation",
+  "metadata": {
+    "version": "1.0",
+    "author": "drone_autonome_system",
+    "created": "2025-09-02",
+    "zone_coords": {
+      "latitude": 31.7917,
+      "longitude": -7.0926,
+      "area_size": "50x50m"
+    }
+  },
+  "tasks": [
+    {
+      "id": "task_001",
+      "type": "ARM",
+      "description": "Armer le drone",
+      "parameters": {},
+      "timeout": 10.0,
+      "required": true,
+      "conditions": {
+        "min_battery": 80.0
+      }
+    },
+    {
+      "id": "task_002", 
+      "type": "TAKEOFF",
+      "description": "Décoller à 5m d'altitude",
+      "parameters": {
+        "altitude": 5.0
+      },
+      "timeout": 30.0,
+      "required": true,
+      "conditions": {
+        "armed": true
+      }
+    },
+    {
+      "id": "task_003",
+      "type": "GOTO",
+      "description": "Aller au point de départ du scan",
+      "parameters": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 5.0,
+        "yaw": 0.0
+      },
+      "timeout": 60.0,
+      "required": true
+    },
+    {
+      "id": "task_004",
+      "type": "SCAN_AREA",
+      "description": "Scanner la zone pour détecter des fleurs",
+      "parameters": {
+        "scan_pattern": "grid",
+        "area_width": 20.0,
+        "area_height": 20.0,
+        "scan_altitude": 5.0,
+        "overlap": 0.3
+      },
+      "timeout": 300.0,
+      "required": true
+    },
+    {
+      "id": "task_005",
+      "type": "DETECT_FLOWERS",
+      "description": "Activer la détection de fleurs pendant le scan",
+      "parameters": {
+        "detection_method": "color_hsv",
+        "target_colors": ["red", "yellow", "pink"],
+        "min_confidence": 0.7
+      },
+      "timeout": 300.0,
+      "required": true
+    },
+    {
+      "id": "task_006",
+      "type": "APPROACH_FLOWER",
+      "description": "Approcher la première fleur détectée",
+      "parameters": {
+        "approach_altitude": 2.0,
+        "precision_radius": 0.5,
+        "hover_time": 3.0
+      },
+      "timeout": 120.0,
+      "required": false
+    },
+    {
+      "id": "task_007",
+      "type": "POLLINATE",
+      "description": "Simuler l'action de pollinisation",
+      "parameters": {
+        "action_type": "air_blast",
+        "duration": 2.0,
+        "intensity": 50
+      },
+      "timeout": 30.0,
+      "required": false
+    },
+    {
+      "id": "task_008",
+      "type": "COLLECT_DATA",
+      "description": "Enregistrer les données de la fleur pollinisée",
+      "parameters": {
+        "capture_image": true,
+        "record_gps": true,
+        "log_timestamp": true,
+        "flower_id": "auto_generate"
+      },
+      "timeout": 15.0,
+      "required": true
+    },
+    {
+      "id": "task_009",
+      "type": "GOTO",
+      "description": "Retourner au point de départ",
+      "parameters": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 5.0,
+        "yaw": 0.0
+      },
+      "timeout": 60.0,
+      "required": true
+    },
+    {
+      "id": "task_010",
+      "type": "LAND",
+      "description": "Atterrir",
+      "parameters": {},
+      "timeout": 30.0,
+      "required": true
+    },
+    {
+      "id": "task_011",
+      "type": "DISARM",
+      "description": "Désarmer le drone",
+      "parameters": {},
+      "timeout": 10.0,
+      "required": false
+    }
+  ]
+}

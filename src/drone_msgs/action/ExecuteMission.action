@@ -1,0 +1,20 @@
+# Goal: Execute a complete mission
+string mission_id
+string mission_name
+bool auto_start
+---
+# Result: Mission completion status
+bool success
+string result_message
+int32 flowers_pollinated
+float64 total_distance
+float64 mission_duration
+string[] failed_tasks
+---
+# Feedback: Real-time mission progress
+string current_task
+float64 progress_percentage
+int32 flowers_found
+int32 flowers_pollinated
+geometry_msgs/Point current_position
+string mission_phase
