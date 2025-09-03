@@ -1,0 +1,9 @@
+# Execute pollination on specific flower
+string flower_id
+string pollination_method       # HOVER, CONTACT, SPRAY
+float64 duration               # Duration in seconds
+---
+# Response
+bool success
+string message
+float64 execution_time

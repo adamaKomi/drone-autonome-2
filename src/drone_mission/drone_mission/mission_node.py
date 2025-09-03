@@ -78,6 +78,12 @@ class TaskType(Enum):
     SURVEY = "SURVEY"               # Mission de reconnaissance
     ORBIT = "ORBIT"                 # Vol en orbite
     CUSTOM = "CUSTOM"               # Tâche personnalisée
+    # Nouvelles tâches pour la pollinisation
+    DETECT_FLOWERS = "DETECT_FLOWERS"           # Détecter des fleurs
+    APPROACH_FLOWER = "APPROACH_FLOWER"         # Approche précise d'une fleur
+    POLLINATE = "POLLINATE"                     # Action de pollinisation
+    COLLECT_DATA = "COLLECT_DATA"               # Collecter des données
+    SCAN_AREA = "SCAN_AREA"                     # Scanner une zone pour fleurs
 
 
 class TaskStatus(Enum):
