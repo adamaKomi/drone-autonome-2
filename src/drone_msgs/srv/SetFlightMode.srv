@@ -1,0 +1,32 @@
+# Service de définition du mode de vol
+# Configure le mode de vol et les paramètres associés
+
+# Requête
+string flight_mode         # Mode vol: MANUAL, STABILIZE, ALTITUDE_HOLD, POSITION_HOLD, AUTO, GUIDED, LOITER, RTL, LAND
+string sub_mode           # Sous-mode spécifique
+float64 max_speed         # Vitesse maximale (m/s)
+float64 max_altitude      # Altitude maximale (m)
+float64 max_distance      # Distance maximale (m)
+bool enable_obstacle_avoidance # Évitement obstacles
+bool enable_geofence      # Géobarrière
+bool enable_return_to_launch # Retour lancement auto
+float64 failsafe_altitude # Altitude sécurité (m)
+string operator_id        # ID opérateur
+bool override_restrictions # Ignorer restrictions
+string[] custom_parameters # Paramètres personnalisés
+---
+# Réponse
+bool success              # Succès changement mode
+string message            # Message retour
+string current_flight_mode # Mode vol actuel
+string previous_flight_mode # Mode vol précédent
+string[] active_restrictions # Restrictions actives
+string[] warnings         # Avertissements
+string[] errors           # Erreurs
+float64 transition_time_seconds # Temps transition (s)
+bool[] safety_systems_active # Systèmes sécurité actifs
+float64 effective_max_speed # Vitesse max effective
+float64 effective_max_altitude # Altitude max effective
+float64 effective_max_distance # Distance max effective
+string[] applied_parameters # Paramètres appliqués
+builtin_interfaces/Time mode_change_timestamp # Horodatage changement

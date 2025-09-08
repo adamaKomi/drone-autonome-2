@@ -1,0 +1,28 @@
+# Service de désarmement du drone
+# Désactive les systèmes du drone et prépare l'arrêt
+
+# Requête
+bool force_disarm          # Forcer désarmement immédiat
+bool emergency_disarm      # Désarmement d'urgence
+string disarm_reason       # Raison désarmement
+bool safe_landing_first    # Atterrissage sécurisé d'abord
+bool save_mission_state    # Sauvegarder état mission
+bool shutdown_systems      # Arrêter systèmes complètement
+string operator_id         # ID opérateur
+bool preserve_logs         # Préserver logs
+---
+# Réponse
+bool success               # Succès désarmement
+string message             # Message retour
+uint8 disarm_status        # État désarmement final
+string[] warnings          # Avertissements
+string[] errors            # Erreurs détectées
+float64 disarm_time_seconds # Temps désarmement (s)
+bool[] system_shutdown_status # État arrêt systèmes
+string[] active_processes  # Processus encore actifs
+bool mission_state_saved   # État mission sauvegardé
+bool logs_preserved        # Logs préservés
+geometry_msgs/Point final_position # Position finale
+float64 final_battery_level # Niveau batterie final
+builtin_interfaces/Duration flight_duration # Durée vol
+builtin_interfaces/Time disarm_timestamp # Horodatage désarmement

@@ -11,7 +11,7 @@
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
-  <depend>yaml-cpp-vendor</depend>
+  <depend>yaml_cpp_vendor</depend>
   <depend>drone_interface</depend>
   <depend>drone_navigation</depend>
   

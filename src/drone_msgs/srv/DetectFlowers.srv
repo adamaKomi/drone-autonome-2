@@ -1,0 +1,32 @@
+# Service de détection de fleurs
+# Lance la détection de fleurs dans la zone actuelle
+
+# Requête
+geometry_msgs/Point search_center # Centre zone recherche
+float64 search_radius_m  # Rayon zone recherche (m)
+string[] target_species  # Espèces cibles (vide = toutes)
+float64 min_confidence   # Confiance minimale détection (0.0-1.0)
+string detection_mode    # Mode: QUICK, DETAILED, COMPREHENSIVE
+bool return_images      # Retourner images détection
+uint32 max_detections   # Nombre max détections
+string operator_id      # ID opérateur
+bool real_time_processing # Traitement temps réel
+string[] filter_criteria # Critères filtrage supplémentaires
+---
+# Réponse
+bool success            # Succès détection
+string message          # Message retour
+uint32 flowers_detected # Nombre fleurs détectées
+geometry_msgs/Point[] flower_positions # Positions fleurs
+string[] flower_species # Espèces détectées
+float64[] confidence_scores # Scores confiance
+string[] flower_ids     # IDs fleurs uniques
+uint32[] flower_sizes_cm # Tailles fleurs (cm)
+string[] flower_colors  # Couleurs dominantes
+string[] flower_states  # États fleurs (budding, blooming, wilting)
+float64 detection_time_seconds # Temps détection (s)
+string[] warnings       # Avertissements
+string[] errors         # Erreurs détection
+bool images_captured    # Images capturées
+string[] image_references # Références images
+builtin_interfaces/Time detection_timestamp # Horodatage détection

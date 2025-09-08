@@ -1,0 +1,34 @@
+# Service d'exécution de pollinisation
+# Exécute une opération de pollinisation sur une fleur cible
+
+# Requête
+string flower_id         # ID fleur cible
+geometry_msgs/Point flower_position # Position fleur
+string flower_species    # Espèce fleur
+string pollination_method # Méthode: VIBRATION, CONTACT, ELECTROSTATIC, SPRAY
+float64 approach_distance_cm # Distance approche (cm)
+float64 contact_duration_s # Durée contact (s)
+uint8 vibration_intensity # Intensité vibration (0-100)
+float64 vibration_frequency_hz # Fréquence vibration (Hz)
+bool collect_sample     # Collecter échantillon
+string approach_angle   # Angle approche: TOP, SIDE, BOTTOM, AUTO
+string operator_id      # ID opérateur
+bool abort_on_movement  # Abandonner si fleur bouge
+---
+# Réponse
+bool success            # Succès pollinisation
+string message          # Message retour
+string pollination_id   # ID opération pollinisation
+float64 pollination_effectiveness # Efficacité estimée (0.0-1.0)
+string[] warnings       # Avertissements
+string[] errors         # Erreurs opération
+float64 actual_contact_duration_s # Durée contact effective (s)
+float64 approach_accuracy_cm # Précision approche (cm)
+bool sample_collected   # Échantillon collecté
+string sample_id        # ID échantillon
+geometry_msgs/Point actual_contact_position # Position contact effective
+string flower_response  # Réponse fleur: POSITIVE, NEUTRAL, NEGATIVE
+float64 pollen_release_estimate # Estimation libération pollen
+builtin_interfaces/Time pollination_timestamp # Horodatage pollinisation
+bool movement_detected  # Mouvement fleur détecté
+string actual_method_used # Méthode effectivement utilisée

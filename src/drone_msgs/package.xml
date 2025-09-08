@@ -3,22 +3,38 @@
 <package format="3">
   <name>drone_msgs</name>
   <version>1.0.0</version>
-  <description>Custom message definitions for the drone pollination system</description>
+  <description>Messages, services et actions ROS2 pour le système de communication des drones de pollinisation</description>
+  
   <maintainer email="adama.komi@example.com">Adama Komi</maintainer>
-  <license>Apache License 2.0</license>
+  <license>MIT</license>
   
+  <url type="website">https://github.com/adamaKomi/drone-autonome-2</url>
+  <url type="bugtracker">https://github.com/adamaKomi/drone-autonome-2/issues</url>
+  <url type="repository">https://github.com/adamaKomi/drone-autonome-2</url>
+  
+  <author email="adama.komi@example.com">Adama Komi</author>
+  
+  <!-- Build dependencies -->
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
   
-  <build_depend>rosidl_default_generators</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>sensor_msgs</build_depend>
+  <!-- Message dependencies -->
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>builtin_interfaces</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>nav_msgs</depend>
   
+  <!-- Runtime dependencies -->
   <exec_depend>rosidl_default_runtime</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
   
+  <!-- Test dependencies -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  
+  <!-- Interface generation -->
   <member_of_group>rosidl_interface_packages</member_of_group>
   
   <export>

@@ -1,0 +1,29 @@
+# Service d'obtention du statut système
+# Récupère l'état actuel de tous les systèmes
+
+# Requête
+string[] requested_systems # Systèmes demandés: ALL, FLIGHT_CONTROL, SENSORS, NAVIGATION, COMMUNICATION, POWER, SAFETY
+string detail_level      # Niveau détail: BASIC, DETAILED, COMPREHENSIVE
+bool include_diagnostics # Inclure diagnostics
+bool include_performance # Inclure métriques performance
+bool include_logs       # Inclure extraits logs récents
+string operator_id      # ID opérateur
+bool real_time_data     # Données temps réel
+---
+# Réponse
+bool success            # Succès récupération statut
+string message          # Message retour
+string overall_status   # Statut global: HEALTHY, WARNING, ERROR, CRITICAL, OFFLINE
+string[] system_statuses # Statuts détaillés par système
+string[] active_warnings # Avertissements actifs
+string[] active_errors  # Erreurs actives
+float64[] system_health_scores # Scores santé par système (0.0-1.0)
+string current_flight_mode # Mode vol actuel
+geometry_msgs/Point current_position # Position actuelle
+float64 current_altitude # Altitude actuelle (m)
+float64 battery_level_percent # Niveau batterie %
+string mission_status   # Statut mission courante
+uint32 connected_sensors # Nombre capteurs connectés
+string[] recent_alerts  # Alertes récentes
+builtin_interfaces/Time status_timestamp # Horodatage statut
+bool real_time_data_available # Données temps réel disponibles

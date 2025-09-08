@@ -1,0 +1,50 @@
+# Action de collecte de données
+# Collecte systématique de données environnementales et biologiques
+
+# Goal - Objectif collecte données
+geometry_msgs/Point[] collection_points # Points collecte données
+string[] data_types       # Types données: ENVIRONMENTAL, VISUAL, SENSOR, BIOLOGICAL
+float64 collection_altitude_m # Altitude collecte (m)
+string collection_pattern # Motif collecte: SEQUENTIAL, OPTIMIZED, PRIORITY_BASED
+builtin_interfaces/Duration hover_time_per_point # Temps vol stationnaire par point
+string[] sensor_configurations # Configurations capteurs
+bool high_resolution_mode # Mode haute résolution
+string data_quality_level # Niveau qualité: BASIC, STANDARD, HIGH, RESEARCH
+bool real_time_processing # Traitement temps réel
+string storage_location   # Emplacement stockage
+string operator_id        # ID opérateur
+---
+# Result - Résultat collecte données
+bool success              # Succès collecte globale
+string completion_status  # Statut: COMPLETED, PARTIAL, STORAGE_FULL, FAILED
+uint32 points_visited     # Points visités
+uint32 data_samples_collected # Échantillons données collectés
+uint64 total_data_size_bytes # Taille totale données (octets)
+uint32 images_captured    # Images capturées
+uint32 sensor_readings    # Lectures capteurs
+float64 collection_time_minutes # Temps collecte (min)
+float64 data_quality_score # Score qualité données (0.0-1.0)
+string[] data_file_paths  # Chemins fichiers données
+string[] metadata_files   # Fichiers métadonnées
+string collection_summary # Résumé collecte
+geometry_msgs/Point[] successful_collection_points # Points collecte réussie
+string[] failed_collection_points # Points collecte échouée
+string[] warnings         # Avertissements
+string[] errors           # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour collecte temps réel
+uint32 current_point_index # Index point courant
+geometry_msgs/Point current_collection_point # Point collecte courant
+string current_activity   # Activité courante
+float64 collection_progress_percentage # Progression collecte (%)
+uint32 data_samples_collected_so_far # Échantillons collectés jusqu'ici
+uint32 images_captured_so_far # Images capturées jusqu'ici
+uint64 data_size_so_far_bytes # Taille données jusqu'ici (octets)
+float64 storage_usage_percentage # Utilisation stockage (%)
+string[] active_sensors   # Capteurs actifs
+string data_quality_status # Statut qualité données
+float64 estimated_time_remaining_minutes # Temps restant estimé (min)
+float64 current_battery_level # Niveau batterie courant (%)
+bool storage_warning      # Avertissement stockage
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

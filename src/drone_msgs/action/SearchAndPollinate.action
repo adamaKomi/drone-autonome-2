@@ -1,0 +1,50 @@
+# Action de recherche et pollinisation
+# Recherche des fleurs dans une zone et les pollinise
+
+# Goal - Objectif recherche et pollinisation
+geometry_msgs/Point search_area_center # Centre zone recherche
+float64 search_area_radius_m # Rayon zone recherche (m)
+string[] target_species     # Espèces cibles (vide = toutes)
+uint32 max_flowers_to_pollinate # Nombre max fleurs à polliniser
+float64 min_detection_confidence # Confiance min détection (0.0-1.0)
+string search_pattern      # Motif recherche: GRID, SPIRAL, RANDOM, ADAPTIVE
+float64 search_altitude_m  # Altitude recherche (m)
+float64 search_speed_ms    # Vitesse recherche (m/s)
+string pollination_method  # Méthode pollinisation
+bool collect_samples       # Collecter échantillons
+bool detailed_documentation # Documentation détaillée
+string operator_id         # ID opérateur
+---
+# Result - Résultat recherche pollinisation
+bool success               # Succès opération globale
+string completion_status   # Statut: COMPLETED, PARTIAL, QUOTA_REACHED, FAILED
+uint32 flowers_detected    # Fleurs détectées total
+uint32 flowers_pollinated  # Fleurs pollinisées avec succès
+uint32 samples_collected   # Échantillons collectés
+float64 area_covered_m2    # Superficie couverte (m²)
+float64 search_time_minutes # Temps recherche (min)
+float64 pollination_time_minutes # Temps pollinisation (min)
+float64 total_distance_m   # Distance totale parcourue (m)
+float64 average_pollination_effectiveness # Efficacité pollinisation moyenne
+string[] species_found     # Espèces trouvées
+geometry_msgs/Point[] pollinated_locations # Emplacements pollinisés
+string[] sample_ids        # IDs échantillons collectés
+string[] warnings          # Avertissements
+string[] errors            # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour recherche pollinisation temps réel
+string current_phase       # Phase courante: SEARCHING, APPROACHING, POLLINATING, MOVING
+geometry_msgs/Point current_position # Position courante
+float64 area_searched_m2   # Superficie déjà cherchée (m²)
+float64 search_progress_percentage # Progression recherche (%)
+uint32 flowers_detected_so_far # Fleurs détectées jusqu'ici
+uint32 flowers_pollinated_so_far # Fleurs pollinisées jusqu'ici
+uint32 samples_collected_so_far # Échantillons collectés jusqu'ici
+string current_target_flower # Fleur cible courante
+geometry_msgs/Point current_target_position # Position cible courante
+float64 estimated_time_remaining_minutes # Temps restant estimé (min)
+float64 current_battery_level # Niveau batterie courant (%)
+string detection_status    # Statut détection
+string[] recent_detections # Détections récentes
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

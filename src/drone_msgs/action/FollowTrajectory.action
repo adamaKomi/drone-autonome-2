@@ -1,0 +1,50 @@
+# Action de suivi de trajectoire
+# Suit une trajectoire prédéfinie avec timing précis
+
+# Goal - Objectif de suivi
+geometry_msgs/Point[] waypoints # Points trajectoire
+builtin_interfaces/Time[] timestamps # Horodatages pour chaque point
+float64[] speeds              # Vitesses pour chaque segment
+float64[] accelerations       # Accélérations pour chaque segment
+string trajectory_type        # Type: LINEAR, SPLINE, BEZIER, CUSTOM
+bool strict_timing           # Respecter timing strict
+float64 position_tolerance_m # Tolérance position (m)
+float64 timing_tolerance_s   # Tolérance timing (s)
+bool use_feedforward        # Utiliser contrôle prédictif
+string control_mode         # Mode contrôle: POSITION, VELOCITY, ACCELERATION
+bool continuous_execution   # Exécution continue
+string operator_id          # ID opérateur
+---
+# Result - Résultat suivi trajectoire
+bool success                # Succès suivi global
+string completion_status    # Statut: COMPLETED, TIMEOUT, DEVIATION, ABORTED
+uint32 waypoints_reached    # Waypoints atteints
+float64 trajectory_completion_percentage # Achèvement trajectoire (%)
+float64 average_position_error_m # Erreur position moyenne (m)
+float64 max_position_error_m # Erreur position maximale (m)
+float64 average_timing_error_s # Erreur timing moyenne (s)
+float64 max_timing_error_s  # Erreur timing maximale (s)
+float64 trajectory_duration_s # Durée trajectoire effective (s)
+float64 total_distance_m    # Distance totale parcourue (m)
+float64 average_speed_ms    # Vitesse moyenne (m/s)
+geometry_msgs/Point[] actual_path # Chemin effectivement suivi
+string[] deviations_detected # Déviations détectées
+string[] warnings           # Avertissements
+string[] errors             # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour suivi en temps réel
+uint32 current_waypoint_index # Index waypoint courant
+geometry_msgs/Point current_position # Position courante
+geometry_msgs/Point target_position # Position cible courante
+float64 position_error_m    # Erreur position courante (m)
+float64 timing_error_s      # Erreur timing courante (s)
+float64 current_speed_ms    # Vitesse courante (m/s)
+float64 target_speed_ms     # Vitesse cible (m/s)
+float64 progress_percentage # Progression trajectoire (%)
+float64 distance_remaining_m # Distance restante (m)
+float64 time_remaining_s    # Temps restant (s)
+string tracking_status      # Statut suivi
+bool on_trajectory         # Sur trajectoire
+float64 trajectory_deviation_m # Déviation trajectoire (m)
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

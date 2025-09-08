@@ -1,0 +1,31 @@
+# Service de navigation vers waypoint
+# Commande la navigation vers un waypoint spécifique
+
+# Requête
+geometry_msgs/Point target_position # Position cible
+float64 target_altitude   # Altitude cible (m)
+float64 navigation_speed  # Vitesse navigation (m/s)
+float64 acceptance_radius # Rayon acceptation (m)
+string navigation_mode    # Mode navigation: DIRECT, PLANNED, SAFE
+bool avoid_obstacles      # Éviter obstacles
+bool use_precision_approach # Approche précision
+string frame_id          # Référentiel coordonnées
+float64 timeout_seconds  # Timeout navigation (s)
+string operator_id       # ID opérateur
+bool override_restrictions # Ignorer restrictions
+---
+# Réponse
+bool success             # Succès navigation
+string message           # Message retour
+geometry_msgs/Point reached_position # Position atteinte
+float64 reached_altitude # Altitude atteinte (m)
+float64 navigation_time_seconds # Temps navigation (s)
+float64 distance_traveled_m # Distance parcourue (m)
+float64 position_accuracy_m # Précision position (m)
+string[] warnings        # Avertissements
+string[] errors          # Erreurs
+string[] obstacles_avoided # Obstacles évités
+bool precision_achieved  # Précision atteinte
+string actual_navigation_mode # Mode navigation effectif
+float64 battery_consumed_percent # Batterie consommée %
+builtin_interfaces/Time arrival_timestamp # Horodatage arrivée

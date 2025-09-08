@@ -1,0 +1,28 @@
+# Service de calibration de capteurs
+# Lance la calibration des capteurs du drone
+
+# Requête
+string[] sensors_to_calibrate # Capteurs à calibrer: IMU, COMPASS, GPS, CAMERA, LIDAR, BAROMETER
+string calibration_type  # Type: FULL, QUICK, SPECIFIC, AUTO
+bool use_reference_data  # Utiliser données référence
+geometry_msgs/Point reference_position # Position référence (GPS)
+float64 reference_altitude # Altitude référence (m)
+string calibration_environment # Environnement: INDOOR, OUTDOOR, MIXED
+bool interactive_mode    # Mode interactif
+string operator_id       # ID opérateur
+bool save_calibration_data # Sauvegarder données calibration
+---
+# Réponse
+bool success             # Succès calibration globale
+string message           # Message retour
+string[] calibrated_sensors # Capteurs calibrés avec succès
+string[] failed_sensors  # Capteurs échec calibration
+float64 calibration_time_seconds # Temps total calibration (s)
+string[] warnings        # Avertissements
+string[] errors          # Erreurs calibration
+float64[] calibration_accuracy # Précision calibration par capteur
+string[] calibration_status # Statut calibration par capteur
+builtin_interfaces/Time calibration_timestamp # Horodatage calibration
+bool reference_data_used # Données référence utilisées
+string[] post_calibration_checks # Vérifications post-calibration
+bool calibration_data_saved # Données calibration sauvegardées

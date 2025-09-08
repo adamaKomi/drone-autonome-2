@@ -1,0 +1,30 @@
+# Service d'atterrissage autonome
+# Exécute une séquence d'atterrissage automatisée
+
+# Requête
+geometry_msgs/Point landing_position # Position atterrissage (optionnelle)
+float64 descent_rate      # Vitesse descente (m/s)
+bool precision_landing    # Atterrissage précision
+bool auto_disarm         # Désarmement automatique
+string landing_mode      # NORMAL, PRECISION, EMERGENCY, FORCED
+bool check_landing_zone  # Vérifier zone atterrissage
+float64 final_approach_altitude # Altitude approche finale (m)
+bool use_visual_markers  # Utiliser marqueurs visuels
+string operator_id       # ID opérateur
+bool abort_on_obstacles  # Abandonner si obstacles
+---
+# Réponse
+bool success             # Succès atterrissage
+string message           # Message retour
+geometry_msgs/Point landing_position # Position atterrissage effectif
+float64 landing_time_seconds # Temps atterrissage (s)
+float64 landing_accuracy_m # Précision atterrissage (m)
+string[] warnings        # Avertissements
+string[] errors          # Erreurs
+bool disarmed           # Drone désarmé
+string[] obstacles_detected # Obstacles détectés
+bool precision_achieved  # Précision atteinte
+string actual_landing_mode # Mode atterrissage effectif
+float64 battery_remaining_percent # Batterie restante %
+builtin_interfaces/Time landing_timestamp # Horodatage atterrissage
+bool visual_markers_used # Marqueurs visuels utilisés

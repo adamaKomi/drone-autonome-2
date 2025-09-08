@@ -1,0 +1,49 @@
+# Action de maintenance préventive
+# Exécute routines de maintenance préventive du système
+
+# Goal - Objectif maintenance
+string[] maintenance_tasks # Tâches maintenance: SENSOR_CALIBRATION, SYSTEM_CHECK, CLEANING, UPDATE, DIAGNOSTICS
+string maintenance_level  # Niveau: BASIC, STANDARD, COMPREHENSIVE, FULL
+bool auto_fix_issues     # Corriger problèmes automatiquement
+bool update_firmware     # Mettre à jour firmware
+bool calibrate_all_sensors # Calibrer tous capteurs
+bool clean_optical_elements # Nettoyer éléments optiques
+bool check_mechanical_components # Vérifier composants mécaniques
+string[] specific_components # Composants spécifiques à vérifier
+string operator_id       # ID opérateur
+bool generate_maintenance_report # Générer rapport maintenance
+---
+# Result - Résultat maintenance
+bool success             # Succès maintenance globale
+string completion_status # Statut: COMPLETED, PARTIAL, ISSUES_FOUND, FAILED
+string[] completed_tasks # Tâches complétées
+string[] failed_tasks    # Tâches échouées
+uint32 issues_found      # Problèmes trouvés
+uint32 issues_fixed      # Problèmes corrigés
+string[] components_checked # Composants vérifiés
+string[] components_calibrated # Composants calibrés
+string[] components_cleaned # Composants nettoyés
+bool firmware_updated    # Firmware mis à jour
+string[] firmware_versions # Versions firmware après
+float64 maintenance_time_minutes # Temps maintenance (min)
+string maintenance_report_path # Chemin rapport maintenance
+string overall_system_health # Santé système globale après
+string[] recommendations # Recommandations maintenance future
+string[] warnings        # Avertissements
+string[] errors          # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour maintenance temps réel
+string current_maintenance_task # Tâche maintenance courante
+float64 maintenance_progress_percentage # Progression maintenance (%)
+string[] completed_tasks_so_far # Tâches complétées jusqu'ici
+uint32 issues_found_so_far # Problèmes trouvés jusqu'ici
+uint32 issues_fixed_so_far # Problèmes corrigés jusqu'ici
+string current_component # Composant courant en maintenance
+string component_status  # Statut composant courant
+float64 estimated_time_remaining_minutes # Temps restant estimé (min)
+string[] recent_calibrations # Calibrations récentes
+string[] recent_cleanings # Nettoyages récents
+bool critical_issue_found # Problème critique trouvé
+string maintenance_phase # Phase maintenance courante
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

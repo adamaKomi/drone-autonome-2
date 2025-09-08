@@ -1,20 +1,46 @@
-# Goal: Execute a complete mission
-string mission_id
-string mission_name
-bool auto_start
+# Action d'exécution de mission complète
+# Exécute une mission de pollinisation du début à la fin
+
+# Goal - Objectif de l'action
+string mission_id           # ID mission à exécuter
+bool auto_takeoff          # Décollage automatique
+bool auto_land             # Atterrissage automatique à la fin
+string execution_mode      # Mode exécution: NORMAL, SAFE, AGGRESSIVE, ADAPTIVE
+float64 speed_factor       # Facteur vitesse (0.1-2.0, 1.0=normal)
+bool allow_deviations      # Permettre déviations mineures
+string[] skip_waypoints    # Waypoints à ignorer (par index)
+bool continuous_monitoring # Surveillance continue
+string operator_id         # ID opérateur
+bool abort_on_weather_change # Abandonner si météo change
 ---
-# Result: Mission completion status
-bool success
-string result_message
-int32 flowers_pollinated
-float64 total_distance
-float64 mission_duration
-string[] failed_tasks
+# Result - Résultat de l'action
+bool success               # Succès mission globale
+string completion_status   # Statut achèvement: COMPLETED, PARTIAL, FAILED, ABORTED
+float64 completion_percentage # Pourcentage achèvement (0.0-100.0)
+uint32 waypoints_completed # Waypoints complétés
+uint32 tasks_completed     # Tâches complétées
+uint32 flowers_pollinated  # Fleurs pollinisées
+float64 mission_duration_minutes # Durée mission (min)
+float64 distance_traveled_m # Distance parcourue (m)
+float64 battery_consumed_percent # Batterie consommée (%)
+geometry_msgs/Point final_position # Position finale
+string[] warnings          # Avertissements mission
+string[] errors            # Erreurs mission
+bool data_saved           # Données sauvegardées
+string mission_summary    # Résumé mission
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
 ---
-# Feedback: Real-time mission progress
-string current_task
-float64 progress_percentage
-int32 flowers_found
-int32 flowers_pollinated
-geometry_msgs/Point current_position
-string mission_phase
+# Feedback - Retour d'information pendant l'exécution
+float64 progress_percentage # Progression actuelle (0.0-100.0)
+uint32 current_waypoint_index # Index waypoint courant
+string current_task        # Tâche courante
+geometry_msgs/Point current_position # Position courante
+float64 remaining_distance_m # Distance restante (m)
+float64 estimated_time_remaining_minutes # Temps restant estimé (min)
+float64 current_battery_level # Niveau batterie actuel (%)
+string current_status      # Statut courant
+uint32 flowers_pollinated_so_far # Fleurs pollinisées jusqu'ici
+string[] active_warnings   # Avertissements actifs
+float64 average_speed_ms   # Vitesse moyenne (m/s)
+string weather_status      # État météo courant
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

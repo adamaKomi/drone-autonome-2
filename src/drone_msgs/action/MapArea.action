@@ -1,0 +1,51 @@
+# Action de cartographie de zone
+# Création d'une carte détaillée de la zone avec végétation
+
+# Goal - Objectif cartographie
+geometry_msgs/Point[] mapping_area_boundary # Limites zone cartographie
+float64 mapping_resolution_m # Résolution cartographie (m/pixel)
+float64 mapping_altitude_m # Altitude cartographie (m)
+string mapping_type       # Type: VISUAL, TOPOGRAPHIC, VEGETATION, MULTISPECTRAL
+float64 overlap_percentage # Pourcentage recouvrement images
+string flight_pattern     # Motif vol: GRID, STRIP, CIRCULAR, ADAPTIVE
+bool create_3d_model     # Créer modèle 3D
+bool detect_vegetation   # Détecter végétation
+string[] analysis_types  # Types analyse: NDVI, RGB, THERMAL, LIDAR
+string coordinate_system # Système coordonnées
+string operator_id       # ID opérateur
+---
+# Result - Résultat cartographie
+bool success             # Succès cartographie
+string completion_status # Statut: COMPLETED, PARTIAL, INSUFFICIENT_DATA, FAILED
+float64 area_mapped_m2   # Superficie cartographiée (m²)
+uint32 images_captured   # Images capturées
+float64 achieved_resolution_m # Résolution atteinte (m/pixel)
+float64 actual_overlap_percentage # Recouvrement effectif (%)
+string map_file_path     # Chemin fichier carte
+string model_3d_file_path # Chemin modèle 3D (si créé)
+uint32 vegetation_patches_detected # Zones végétation détectées
+float64 vegetation_coverage_percentage # Couverture végétation (%)
+string[] analysis_results_files # Fichiers résultats analyses
+float64 mapping_time_minutes # Temps cartographie (min)
+float64 flight_distance_m # Distance vol (m)
+string cartography_summary # Résumé cartographie
+geometry_msgs/Point[] coverage_gaps # Zones non couvertes
+string[] warnings        # Avertissements
+string[] errors          # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour cartographie temps réel
+geometry_msgs/Point current_position # Position courante
+float64 mapping_progress_percentage # Progression cartographie (%)
+float64 area_mapped_so_far_m2 # Superficie cartographiée jusqu'ici (m²)
+uint32 images_captured_so_far # Images capturées jusqu'ici
+string current_mapping_activity # Activité cartographie courante
+uint32 current_strip_number # Numéro bande courante
+float64 current_overlap_achieved # Recouvrement atteint courant (%)
+string image_quality_status # Statut qualité images
+float64 estimated_time_remaining_minutes # Temps restant estimé (min)
+float64 current_battery_level # Niveau batterie courant (%)
+string[] recent_detections # Détections récentes
+bool gps_quality_sufficient # Qualité GPS suffisante
+string weather_impact_status # Statut impact météo
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

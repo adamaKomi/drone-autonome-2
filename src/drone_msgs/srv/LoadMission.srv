@@ -1,0 +1,31 @@
+# Service de chargement de mission
+# Charge et configure une mission de pollinisation
+
+# Requête
+string mission_file       # Fichier mission
+string mission_data       # Données mission JSON/YAML
+string mission_type       # Type mission: POLLINATION, SURVEY, INSPECTION, CUSTOM
+bool validate_mission     # Valider mission avant chargement
+bool overwrite_existing   # Écraser mission existante
+string mission_name       # Nom mission
+string operator_id        # ID opérateur
+bool auto_optimize        # Optimiser mission automatiquement
+string[] mission_parameters # Paramètres mission supplémentaires
+---
+# Réponse
+bool success              # Succès chargement
+string message            # Message retour
+string mission_id         # ID mission chargé
+uint32 waypoint_count     # Nombre waypoints
+uint32 task_count         # Nombre tâches
+float64 estimated_duration_minutes # Durée estimée (min)
+float64 estimated_distance_m # Distance estimée (m)
+float64 estimated_battery_usage_percent # Utilisation batterie estimée %
+string[] warnings         # Avertissements
+string[] errors           # Erreurs validation
+string[] mission_summary  # Résumé mission
+bool mission_optimized    # Mission optimisée
+geometry_msgs/Point[] waypoints_preview # Aperçu waypoints
+string mission_status     # Statut mission
+builtin_interfaces/Time load_timestamp # Horodatage chargement
+bool validation_passed    # Validation réussie

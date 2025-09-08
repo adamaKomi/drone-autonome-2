@@ -1,0 +1,27 @@
+# Service de pause/reprise de mission
+# Met en pause ou reprend l'exécution de la mission
+
+# Requête
+string mission_id         # ID mission
+string action            # Action: PAUSE, RESUME, TOGGLE
+string pause_reason      # Raison pause
+bool hold_position       # Maintenir position
+bool safe_hover         # Vol stationnaire sécurisé
+float64 pause_duration_seconds # Durée pause (s, 0=indéfini)
+string operator_id       # ID opérateur
+bool auto_resume        # Reprise automatique
+---
+# Réponse
+bool success            # Succès action
+string message          # Message retour
+string current_status   # Statut courant: PAUSED, RESUMED, ACTIVE
+string previous_status  # Statut précédent
+geometry_msgs/Point pause_position # Position pause
+float64 pause_time_seconds # Temps pause effectif (s)
+string[] warnings       # Avertissements
+string[] errors         # Erreurs
+bool position_held      # Position maintenue
+bool safe_hover_active  # Vol stationnaire sécurisé actif
+builtin_interfaces/Time action_timestamp # Horodatage action
+float64 mission_progress_at_pause # Progression à la pause %
+bool auto_resume_scheduled # Reprise auto programmée

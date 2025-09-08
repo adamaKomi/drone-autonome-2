@@ -1,0 +1,28 @@
+# Service de mise à jour de paramètres
+# Met à jour les paramètres de configuration du drone
+
+# Requête
+string parameter_group   # Groupe paramètres: FLIGHT, NAVIGATION, SAFETY, SENSORS, COMMUNICATION
+string[] parameter_names # Noms paramètres à modifier
+string[] parameter_values # Nouvelles valeurs (format string)
+string[] parameter_types # Types paramètres: INT, FLOAT, STRING, BOOL, ARRAY
+bool validate_parameters # Valider paramètres avant application
+bool apply_immediately   # Appliquer immédiatement
+bool save_to_persistent  # Sauvegarder de façon persistante
+string operator_id       # ID opérateur
+bool backup_current     # Sauvegarder configuration actuelle
+---
+# Réponse
+bool success            # Succès mise à jour globale
+string message          # Message retour
+string[] updated_parameters # Paramètres mis à jour avec succès
+string[] failed_parameters # Paramètres échec mise à jour
+string[] parameter_warnings # Avertissements par paramètre
+string[] parameter_errors # Erreurs par paramètre
+string backup_id        # ID sauvegarde configuration
+bool restart_required   # Redémarrage requis
+string[] affected_systems # Systèmes affectés
+bool validation_passed  # Validation réussie
+float64 update_time_seconds # Temps mise à jour (s)
+builtin_interfaces/Time update_timestamp # Horodatage mise à jour
+bool persistent_save_successful # Sauvegarde persistante réussie

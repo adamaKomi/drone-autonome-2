@@ -29,3 +29,36 @@ ros2 topic echo /mavros/setpoint_position/local
 ```
 pour vérifier la réception des commandes de position.
 
+
+
+## 4. Lancer un noeud
+
+### 4.1. Verifier d'abord les dependences manquantes
+
+```bash
+rosdep install -i --from-path src --rosdistro humble -y
+```
+
+### 4.2. Compiler tous les packages
+
+```bash
+colcon build
+```
+
+### 4.3. Compiler un package
+
+```bash
+colcon build --packages-select <nom_package>
+```
+
+### 4.4. Compiler un package avec overriding
+
+```bash
+colcon build --packages-select <nom_package> --allow-overriding <nom_package> 
+```
+
+### 4.5. Lancer le noeud
+
+```bash
+ros2 run <nom_package> <nom_noeud>
+```

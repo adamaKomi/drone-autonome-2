@@ -1,0 +1,29 @@
+# Service de définition de waypoint
+# Définit ou modifie un waypoint de navigation
+
+# Requête
+uint32 waypoint_index     # Index waypoint (0=nouveau)
+geometry_msgs/Point position # Position waypoint
+float64 altitude         # Altitude (m)
+float64 speed           # Vitesse à ce waypoint (m/s)
+string action_type      # Type action: WAYPOINT, HOVER, LAND, TAKEOFF, POLLINATE
+float64 hover_time      # Temps vol stationnaire (s)
+float64 acceptance_radius # Rayon acceptation (m)
+string frame_id         # Référentiel coordonnées
+bool is_mandatory       # Waypoint obligatoire
+string operator_id      # ID opérateur
+string[] additional_parameters # Paramètres supplémentaires
+---
+# Réponse
+bool success            # Succès définition waypoint
+string message          # Message retour
+uint32 assigned_index   # Index assigné
+geometry_msgs/Point confirmed_position # Position confirmée
+string[] warnings       # Avertissements
+string[] errors         # Erreurs validation
+bool waypoint_reachable # Waypoint atteignable
+float64 distance_from_previous_m # Distance waypoint précédent (m)
+float64 estimated_travel_time_s # Temps voyage estimé (s)
+string waypoint_status  # Statut waypoint
+builtin_interfaces/Time creation_timestamp # Horodatage création
+bool safety_check_passed # Vérification sécurité réussie

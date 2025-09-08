@@ -1,0 +1,50 @@
+# Action de surveillance de zone
+# Surveillance continue d'une zone pour changements et activité
+
+# Goal - Objectif surveillance
+geometry_msgs/Point[] zone_boundary # Limites zone surveillance
+float64 surveillance_altitude_m # Altitude surveillance (m)
+float64 patrol_speed_ms    # Vitesse patrouille (m/s)
+string patrol_pattern      # Motif patrouille: PERIMETER, GRID, RANDOM, OPTIMIZED
+builtin_interfaces/Duration surveillance_duration # Durée surveillance
+uint32 detection_interval_seconds # Intervalle détection (s)
+string[] detection_targets # Cibles détection: FLOWERS, CHANGES, MOVEMENT, THREATS
+float64 detection_sensitivity # Sensibilité détection (0.0-1.0)
+bool continuous_recording  # Enregistrement continu
+bool alert_on_changes     # Alerter sur changements
+string operator_id        # ID opérateur
+bool return_on_completion # Retour automatique fin
+---
+# Result - Résultat surveillance
+bool success              # Succès surveillance
+string completion_status  # Statut: COMPLETED, TIMEOUT, INTERRUPTED, ABORTED
+float64 surveillance_time_minutes # Temps surveillance effectif (min)
+float64 area_covered_m2   # Superficie couverte (m²)
+uint32 patrol_cycles_completed # Cycles patrouille complétés
+uint32 detections_made    # Détections effectuées
+uint32 alerts_generated   # Alertes générées
+uint32 changes_detected   # Changements détectés
+float64 total_distance_m  # Distance totale parcourue (m)
+string[] significant_events # Événements significatifs
+geometry_msgs/Point[] detection_locations # Emplacements détections
+string[] recorded_data_files # Fichiers données enregistrées
+string surveillance_summary # Résumé surveillance
+string[] warnings         # Avertissements
+string[] errors           # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour surveillance temps réel
+string current_activity   # Activité courante
+geometry_msgs/Point current_position # Position courante
+float64 surveillance_progress_percentage # Progression surveillance (%)
+uint32 current_patrol_cycle # Cycle patrouille courant
+float64 area_covered_so_far_m2 # Superficie couverte jusqu'ici (m²)
+uint32 detections_this_cycle # Détections ce cycle
+uint32 total_detections   # Total détections
+string[] recent_detections # Détections récentes
+string[] active_alerts    # Alertes actives
+float64 time_remaining_minutes # Temps restant (min)
+float64 current_battery_level # Niveau batterie courant (%)
+string patrol_status      # Statut patrouille
+bool recording_active     # Enregistrement actif
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

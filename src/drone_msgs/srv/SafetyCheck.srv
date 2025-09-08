@@ -1,0 +1,29 @@
+# Service de vérification sécurité
+# Effectue une vérification complète des systèmes de sécurité
+
+# Requête
+string check_type         # Type vérification: PREFLIGHT, RUNTIME, POSTFLIGHT, COMPREHENSIVE
+bool check_all_systems    # Vérifier tous systèmes
+string[] systems_to_check # Systèmes spécifiques à vérifier
+bool include_sensors      # Inclure vérification capteurs
+bool include_communication # Inclure vérification communication
+bool include_navigation   # Inclure vérification navigation
+bool include_power        # Inclure vérification alimentation
+string operator_id        # ID opérateur
+bool detailed_report      # Rapport détaillé
+---
+# Réponse
+bool success              # Succès vérification
+string message            # Message retour
+bool overall_safety_status # Statut sécurité global
+float64 safety_score      # Score sécurité 0.0-1.0
+string[] warnings         # Avertissements sécurité
+string[] errors           # Erreurs sécurité
+string[] critical_issues  # Problèmes critiques
+bool[] system_status      # Statut systèmes vérifiés
+string[] system_names     # Noms systèmes vérifiés
+string[] recommendations  # Recommandations
+float64 check_duration_seconds # Durée vérification (s)
+builtin_interfaces/Time check_timestamp # Horodatage vérification
+bool flight_authorized    # Vol autorisé
+string[] required_actions # Actions requises avant vol

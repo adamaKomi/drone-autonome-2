@@ -5,31 +5,106 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Find dependencies
+# find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-# Generate interfaces
+# Generate ROS2 interfaces
 rosidl_generate_interfaces(${PROJECT_NAME}
+  # Messages
   "msg/DroneStatus.msg"
+  "msg/DroneState.msg"
+  "msg/FlightMode.msg"
+  "msg/SafetyStatus.msg"
+  "msg/BatteryStatus.msg"
+  "msg/Position3D.msg"
+  "msg/Orientation.msg"
+  "msg/Velocity3D.msg"
+  "msg/NavigationCommand.msg"
+  "msg/Waypoint.msg"
+  "msg/Trajectory.msg"
   "msg/FlowerDetection.msg"
+  "msg/FlowerClassification.msg"
+  "msg/FlowerTarget.msg"
+  "msg/PollinationResult.msg"
   "msg/MissionStatus.msg"
-  "msg/PollinationTask.msg"
-  "srv/SetMissionPlan.srv"
-  "srv/GetFlowerPosition.srv"
-  "srv/PollinateFlower.srv"
+  "msg/MissionProgress.msg"
+  "msg/MissionWaypoint.msg"
+  "msg/ZoneDefinition.msg"
+  "msg/EnvironmentData.msg"
+  "msg/PerformanceMetrics.msg"
+  "msg/SystemAlert.msg"
+  "msg/DiagnosticInfo.msg"
+  
+  # Services
+  "srv/ArmDrone.srv"
+  "srv/CalibrateSensors.srv"
+  "srv/ConfigureCamera.srv"
+  "srv/DetectFlowers.srv"
+  "srv/DisarmDrone.srv"
+  "srv/EmergencyStop.srv"
+  "srv/ExecutePollination.srv"
+  "srv/GetSystemStatus.srv"
+  "srv/Land.srv"
+  "srv/LoadMission.srv"
+  "srv/NavigateToWaypoint.srv"
+  "srv/PauseMission.srv"
+  "srv/ReturnToLaunch.srv"
+  "srv/SafetyCheck.srv"
+  "srv/SaveData.srv"
+  "srv/SetFlightMode.srv"
+  "srv/SetGeofence.srv"
+  "srv/SetTrajectory.srv"
+  "srv/SetWaypoint.srv"
+  "srv/StartMission.srv"
+  "srv/StopMission.srv"
+  "srv/SystemDiagnostic.srv"
+  "srv/Takeoff.srv"
+  "srv/UpdateParameters.srv"
+  
+  # Actions
+  "action/CollectData.action"
+  "action/EmergencyLanding.action"
   "action/ExecuteMission.action"
-  "action/ApproachFlower.action"
-  DEPENDENCIES std_msgs geometry_msgs sensor_msgs
+  "action/FollowTrajectory.action"
+  "action/MapArea.action"
+  "action/MonitorZone.action"
+  "action/NavigateToPosition.action"
+  "action/PerformMaintenance.action"
+  "action/SearchAndPollinate.action"
+  
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  builtin_interfaces
+  diagnostic_msgs
+  nav_msgs
 )
 
+# Export dependencies
+ament_export_dependencies(rosidl_default_runtime)
+
+# Tests
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
+  
+  # Custom tests
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_messages test/test_messages.py)
+  ament_add_pytest_test(test_services test/test_services.py)
+  ament_add_pytest_test(test_actions test/test_actions.py)
 endif()
 
-ament_export_dependencies(rosidl_default_runtime)
+# Install resource marker
+install(FILES resource/${PROJECT_NAME}
+  DESTINATION share/${PROJECT_NAME}/resource)
+
 ament_package()

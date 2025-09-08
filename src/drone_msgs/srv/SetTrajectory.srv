@@ -1,0 +1,30 @@
+# Service de définition de trajectoire
+# Définit et configure une trajectoire de vol
+
+# Requête
+geometry_msgs/Point[] waypoints # Points de passage
+float64[] altitudes      # Altitudes correspondantes (m)
+float64[] speeds         # Vitesses par segment (m/s)
+float64[] hover_times    # Temps vol stationnaire par point (s)
+string trajectory_type   # Type trajectoire: LINEAR, SPLINE, BEZIER, OPTIMAL
+bool optimize_path       # Optimiser chemin
+bool smooth_trajectory   # Lisser trajectoire
+float64 safety_margin_m  # Marge sécurité (m)
+string operator_id       # ID opérateur
+bool validate_trajectory # Valider trajectoire
+---
+# Réponse
+bool success             # Succès définition trajectoire
+string message           # Message retour
+uint32 trajectory_id     # ID trajectoire créée
+uint32 waypoint_count    # Nombre waypoints
+float64 total_distance_m # Distance totale (m)
+float64 estimated_duration_minutes # Durée estimée (min)
+float64 max_speed_required_mps # Vitesse max requise (m/s)
+string[] warnings        # Avertissements
+string[] errors          # Erreurs validation
+bool trajectory_feasible # Trajectoire faisable
+bool optimization_applied # Optimisation appliquée
+geometry_msgs/Point[] optimized_waypoints # Waypoints optimisés
+float64 trajectory_smoothness # Lissage trajectoire 0.0-1.0
+builtin_interfaces/Time creation_timestamp # Horodatage création

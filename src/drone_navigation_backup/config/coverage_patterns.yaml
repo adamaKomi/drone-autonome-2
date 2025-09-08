@@ -1,0 +1,6 @@
+# drone_navigation/config/coverage_patterns.yaml
+coverage_patterns:
+  zigzag:
+    overlap: 20
+  spiral:
+    spacing: 5.0

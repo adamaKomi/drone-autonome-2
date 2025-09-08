@@ -1,0 +1,30 @@
+# Service de décollage autonome
+# Exécute une séquence de décollage automatisée
+
+# Requête
+float64 target_altitude    # Altitude cible (m)
+geometry_msgs/Point takeoff_position # Position décollage (optionnelle)
+float64 climb_rate         # Vitesse montée (m/s)
+float64 hover_time         # Temps vol stationnaire après décollage (s)
+bool auto_hover           # Vol stationnaire automatique
+bool check_obstacles      # Vérifier obstacles
+bool use_precision_takeoff # Décollage précision
+string takeoff_mode       # NORMAL, PRECISION, EMERGENCY, VERTICAL
+bool wait_for_clearance   # Attendre autorisation
+string operator_id        # ID opérateur
+---
+# Réponse
+bool success              # Succès décollage
+string message            # Message retour
+float64 achieved_altitude # Altitude atteinte (m)
+geometry_msgs/Point final_position # Position finale
+float64 takeoff_time_seconds # Temps décollage (s)
+string[] warnings         # Avertissements
+string[] errors           # Erreurs
+bool hover_active         # Vol stationnaire actif
+float64 battery_consumed_percent # Batterie consommée %
+string[] obstacles_detected # Obstacles détectés
+float64 precision_accuracy_m # Précision décollage (m)
+string actual_takeoff_mode # Mode décollage effectif
+builtin_interfaces/Time takeoff_timestamp # Horodatage décollage
+bool clearance_received   # Autorisation reçue

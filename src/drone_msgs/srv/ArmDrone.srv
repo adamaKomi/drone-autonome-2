@@ -1,0 +1,27 @@
+# Service d'armement du drone
+# Prépare le drone pour le vol en activant tous les systèmes
+
+# Requête
+bool force_arm              # Forcer armement même avec avertissements
+bool skip_preflight        # Ignorer vérifications pré-vol
+string[] override_checks    # Vérifications à ignorer
+string arm_mode            # NORMAL, EMERGENCY, MAINTENANCE, TEST
+bool enable_failsafes      # Activer systèmes sécurité
+bool calibrate_sensors     # Calibrer capteurs avant armement
+string operator_id         # ID opérateur
+string mission_context     # Contexte mission
+---
+# Réponse
+bool success               # Succès armement
+string message             # Message retour
+uint8 arm_status           # État armement final
+string[] warnings          # Avertissements
+string[] errors            # Erreurs détectées
+float64 arm_time_seconds   # Temps armement (s)
+bool[] system_status       # État systèmes [moteurs, capteurs, communication, navigation, sécurité]
+string[] failed_checks     # Vérifications échouées
+string[] system_messages   # Messages système
+float64 battery_level      # Niveau batterie au moment armement
+geometry_msgs/Point current_position # Position courante
+bool emergency_stop_armed  # Arrêt urgence armé
+builtin_interfaces/Time arm_timestamp # Horodatage armement

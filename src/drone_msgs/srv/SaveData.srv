@@ -1,0 +1,33 @@
+# Service de sauvegarde des données
+# Sauvegarde les données collectées durant les opérations
+
+# Requête
+string data_type        # Type données: MISSION, TELEMETRY, IMAGES, SENSOR_DATA, LOGS, ALL
+string save_location    # Emplacement sauvegarde
+string save_format      # Format: JSON, CSV, XML, BINARY, COMPRESSED
+builtin_interfaces/Time start_time # Début période données
+builtin_interfaces/Time end_time # Fin période données
+bool include_metadata   # Inclure métadonnées
+bool compress_data      # Compresser données
+string encryption_level # Chiffrement: NONE, BASIC, ADVANCED
+string[] specific_missions # Missions spécifiques (si applicable)
+string operator_id      # ID opérateur
+bool verify_integrity   # Vérifier intégrité après sauvegarde
+---
+# Réponse
+bool success           # Succès sauvegarde
+string message         # Message retour
+string save_path       # Chemin sauvegarde effectif
+uint64 data_size_bytes # Taille données sauvegardées (octets)
+uint32 files_created   # Nombre fichiers créés
+string[] file_paths    # Chemins fichiers créés
+string checksum        # Somme contrôle données
+float64 save_time_seconds # Temps sauvegarde (s)
+string[] warnings      # Avertissements
+string[] errors        # Erreurs sauvegarde
+bool compression_applied # Compression appliquée
+float64 compression_ratio # Ratio compression
+bool encryption_applied # Chiffrement appliqué
+bool integrity_verified # Intégrité vérifiée
+builtin_interfaces/Time save_timestamp # Horodatage sauvegarde
+string backup_id       # ID sauvegarde unique

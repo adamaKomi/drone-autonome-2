@@ -1,0 +1,29 @@
+# Service de diagnostic système
+# Exécute un diagnostic complet du système drone
+
+# Requête
+string diagnostic_type   # Type: FULL, QUICK, SPECIFIC, SCHEDULED
+string[] systems_to_check # Systèmes à vérifier: FLIGHT_CONTROL, SENSORS, COMMUNICATION, POWER, NAVIGATION
+string diagnostic_level  # Niveau: BASIC, DETAILED, COMPREHENSIVE
+bool include_performance_test # Inclure tests performance
+bool generate_report     # Générer rapport
+string operator_id       # ID opérateur
+bool fix_issues_automatically # Corriger problèmes automatiquement
+string[] custom_tests    # Tests personnalisés
+---
+# Réponse
+bool success             # Succès diagnostic global
+string message           # Message retour
+string diagnostic_id     # ID diagnostic
+string overall_health_status # État santé global: EXCELLENT, GOOD, FAIR, POOR, CRITICAL
+float64 overall_health_score # Score santé global (0.0-1.0)
+string[] system_status   # Statut par système
+string[] issues_found    # Problèmes détectés
+string[] recommendations # Recommandations
+string[] warnings        # Avertissements
+string[] errors          # Erreurs critiques
+float64 diagnostic_time_seconds # Temps diagnostic (s)
+bool report_generated    # Rapport généré
+string report_location   # Emplacement rapport
+string[] auto_fixes_applied # Corrections automatiques appliquées
+builtin_interfaces/Time diagnostic_timestamp # Horodatage diagnostic

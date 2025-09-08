@@ -1,9 +1,0 @@
-# Request a flower's position for approach
-string flower_id
----
-# Response with flower position
-bool success
-string message
-geometry_msgs/Point flower_position
-float64 approach_distance
-float64 confidence

@@ -1,0 +1,38 @@
+# Service de configuration de la caméra
+# Configure les paramètres de la caméra pour la détection
+
+# Requête
+string camera_id         # ID caméra (si plusieurs)
+uint32 resolution_width  # Largeur résolution
+uint32 resolution_height # Hauteur résolution
+uint32 framerate        # Images par seconde
+string capture_mode     # Mode capture: CONTINUOUS, TRIGGERED, MISSION_BASED
+float64 exposure_time   # Temps exposition (s)
+float64 gain            # Gain capteur
+float64 white_balance_temperature # Balance blancs (K)
+bool auto_exposure      # Exposition automatique
+bool auto_gain         # Gain automatique
+bool auto_white_balance # Balance blancs automatique
+string focus_mode      # Mode focus: AUTO, MANUAL, INFINITY
+float64 manual_focus_distance # Distance focus manuelle (m)
+string image_format    # Format image: JPEG, RAW, PNG
+uint8 compression_quality # Qualité compression (0-100)
+bool enable_stabilization # Stabilisation activée
+string operator_id     # ID opérateur
+---
+# Réponse
+bool success           # Succès configuration
+string message         # Message retour
+string configured_camera_id # ID caméra configurée
+string[] warnings      # Avertissements
+string[] errors        # Erreurs configuration
+uint32 actual_resolution_width # Largeur résolution effective
+uint32 actual_resolution_height # Hauteur résolution effective
+uint32 actual_framerate # FPS effectif
+float64 actual_exposure # Exposition effective
+float64 actual_gain    # Gain effectif
+bool stabilization_active # Stabilisation active
+string[] supported_formats # Formats supportés
+string current_focus_mode # Mode focus actuel
+builtin_interfaces/Time config_timestamp # Horodatage configuration
+bool camera_ready      # Caméra prête

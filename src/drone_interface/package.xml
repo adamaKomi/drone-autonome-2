@@ -2,51 +2,39 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>drone_interface</name>
-  <version>3.0.0</version>
-  <description>
-    Interface ROS2 robuste pour contrôle de drones ArduPilot via MAVROS.
-    Package Python pur avec lifecycle management, sécurité avancée et monitoring complet.
-  </description>
+  <version>0.1.0</version>
+  <description>Interface de contrôle de base pour drone avec MAVROS - ROS2 Humble</description>
   
-  <author email="adama.komi@example.com">Adama Komi</author>
-  <maintainer email="adama.komi@example.com">Adama Komi</maintainer>
+  <maintainer email="adamakomi15@gmail.com">Adama Komi</maintainer>
+  <license>Apache-2.0</license>
   
-  <license>MIT</license>
-  
-  <url type="website">https://github.com/adamakomi/drone_interface</url>
-  <url type="bugtracker">https://github.com/adamakomi/drone_interface/issues</url>
-  <url type="repository">https://github.com/adamakomi/drone_interface</url>
-  
-  <!-- Build tool pour packages Python purs -->
   <buildtool_depend>ament_python</buildtool_depend>
   
-  <!-- Dépendances Python ROS2 -->
+  <!-- Dependencies pour ROS2 Humble -->
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
-  <depend>nav_msgs</depend>
-  <depend>diagnostic_msgs</depend>
-  <depend>builtin_interfaces</depend>
   <depend>std_srvs</depend>
+
   
-  <!-- Lifecycle (Python) -->
-  <depend>lifecycle_msgs</depend>
-  
-  <!-- MAVROS -->
-  <depend>mavros</depend>
+  <!-- MAVROS dependencies -->
   <depend>mavros_msgs</depend>
   
-  <!-- Launch system -->
-  <depend>launch</depend>
-  <depend>launch_ros</depend>
+  <!-- Custom drone messages -->
+  <depend>drone_msgs</depend>
   
-  <!-- Dépendances de test Python -->
+  <!-- For services -->
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  
+  <!-- Testing -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
   
-  <!-- Type de package Python -->
   <export>
     <build_type>ament_python</build_type>
   </export>

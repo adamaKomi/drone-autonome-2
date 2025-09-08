@@ -1,0 +1,47 @@
+# Action d'atterrissage d'urgence
+# Exécute un atterrissage d'urgence sécurisé
+
+# Goal - Objectif atterrissage urgence
+string emergency_type    # Type urgence: BATTERY_CRITICAL, MOTOR_FAILURE, WEATHER, COLLISION_RISK, SYSTEM_FAILURE
+geometry_msgs/Point preferred_landing_site # Site atterrissage préféré (optionnel)
+float64 max_descent_rate # Taux descente max (m/s)
+bool use_emergency_power # Utiliser puissance urgence
+bool broadcast_emergency # Diffuser urgence
+string[] safety_priorities # Priorités sécurité: HUMAN_SAFETY, DRONE_PRESERVATION, DATA_PRESERVATION
+bool attempt_controlled_descent # Tenter descente contrôlée
+string operator_id       # ID opérateur
+bool preserve_mission_data # Préserver données mission
+---
+# Result - Résultat atterrissage urgence
+bool success             # Succès atterrissage urgence
+string landing_status    # Statut: SAFE_LANDING, HARD_LANDING, CRASH_LANDING, WATER_LANDING
+geometry_msgs/Point landing_position # Position atterrissage effective
+float64 descent_time_seconds # Temps descente (s)
+float64 impact_velocity_ms # Vitesse impact (m/s)
+string[] damage_assessment # Évaluation dommages
+bool drone_recoverable   # Drone récupérable
+bool data_preserved      # Données préservées
+bool emergency_broadcast_sent # Diffusion urgence envoyée
+string[] emergency_services_notified # Services urgence notifiés
+float64 battery_level_at_landing # Niveau batterie à l'atterrissage (%)
+string emergency_beacon_status # Statut balise urgence
+string[] safety_measures_activated # Mesures sécurité activées
+string[] warnings        # Avertissements
+string[] errors          # Erreurs
+builtin_interfaces/Time landing_timestamp # Horodatage atterrissage
+---
+# Feedback - Retour atterrissage urgence temps réel
+string current_emergency_phase # Phase urgence courante
+geometry_msgs/Point current_position # Position courante
+float64 current_altitude # Altitude courante (m)
+float64 descent_rate_ms  # Taux descente courant (m/s)
+float64 time_to_ground_s # Temps jusqu'au sol (s)
+string descent_status    # Statut descente
+bool landing_site_identified # Site atterrissage identifié
+geometry_msgs/Point target_landing_site # Site atterrissage cible
+float64 distance_to_landing_m # Distance site atterrissage (m)
+float64 current_battery_level # Niveau batterie courant (%)
+string[] active_safety_measures # Mesures sécurité actives
+bool emergency_power_active # Puissance urgence active
+string[] systems_status  # Statut systèmes
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

@@ -1,0 +1,29 @@
+# Service de configuration de géobarrière
+# Configure les limites géographiques de vol
+
+# Requête
+string geofence_type     # Type: POLYGON, CIRCLE, ALTITUDE, COMPOSITE
+geometry_msgs/Point[] boundary_points # Points limite (polygone)
+geometry_msgs/Point center_point # Point central (cercle)
+float64 radius_m         # Rayon (m, pour cercle)
+float64 min_altitude_m   # Altitude minimale (m)
+float64 max_altitude_m   # Altitude maximale (m)
+string action_on_breach  # Action violation: WARNING, RTL, LAND, HOVER, EMERGENCY_STOP
+bool enable_geofence     # Activer géobarrière
+string geofence_name     # Nom géobarrière
+string operator_id       # ID opérateur
+bool override_existing   # Remplacer géobarrière existante
+---
+# Réponse
+bool success             # Succès configuration
+string message           # Message retour
+string geofence_id       # ID géobarrière créé
+string[] warnings        # Avertissements
+string[] errors          # Erreurs validation
+bool geofence_active     # Géobarrière active
+float64 area_km2         # Superficie (km²)
+geometry_msgs/Point[] validated_boundary # Limite validée
+bool altitude_constraints_applied # Contraintes altitude appliquées
+string breach_action_confirmed # Action violation confirmée
+builtin_interfaces/Time creation_timestamp # Horodatage création
+bool conflicts_with_existing # Conflits avec géobarrières existantes

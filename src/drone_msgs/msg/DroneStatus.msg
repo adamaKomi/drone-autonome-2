@@ -1,32 +1,33 @@
-# Drone status message
+# État général du drone de pollinisation
 std_msgs/Header header
 
-# System state
-string state                    # DISCONNECTED, CONNECTED, ARMED, FLYING, LANDING, EMERGENCY
-string mode                     # MANUAL, GUIDED, AUTO, RTL, LAND
-bool armed
-bool connected
-bool guided
+# État général
+bool is_armed
+bool is_flying
+bool is_connected
+bool is_healthy
 
-# Position and navigation
+# Mode de vol
+string flight_mode              # MANUAL, AUTO, GUIDED, RTL, LAND, etc.
+string mission_state           # IDLE, PLANNING, EXECUTING, PAUSED, COMPLETED
+
+# Position et orientation
 geometry_msgs/Point position
-geometry_msgs/Vector3 velocity
-float64 altitude
-float64 home_distance
+geometry_msgs/Quaternion orientation
+geometry_msgs/Twist velocity
 
-# Power and safety
-float64 battery_voltage
-float64 battery_percentage
-bool gps_fix
-int32 gps_satellites
+# Systèmes
+BatteryStatus battery
+SafetyStatus safety
+PerformanceMetrics performance
 
-# Safety alerts
-bool critical_battery_warning
-bool low_battery_warning
-bool altitude_warning
-bool geofence_violation
+# Statut modules
+bool navigation_active
+bool vision_active
+bool mission_active
+bool communication_active
 
-# Mission context
-string mission_id
-string current_task
-float64 last_heartbeat
+# Alertes et erreurs
+SystemAlert[] active_alerts
+string[] error_messages
+uint8 severity_level           # 0=INFO, 1=WARNING, 2=ERROR, 3=CRITICAL

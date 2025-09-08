@@ -1,0 +1,51 @@
+# Action de navigation vers une position
+# Navigate vers une position spécifiée avec évitement d'obstacles
+
+# Goal - Objectif de navigation
+geometry_msgs/Point target_position # Position cible
+float64 target_altitude    # Altitude cible (m)
+float64 target_yaw         # Orientation cible (rad)
+float64 speed_limit        # Limite vitesse (m/s)
+float64 acceleration_limit # Limite accélération (m/s²)
+bool use_obstacle_avoidance # Utiliser évitement obstacles
+string path_planning_mode  # Mode planification: DIRECT, SAFE, OPTIMAL, CUSTOM
+float64 acceptance_radius  # Rayon acceptation (m)
+float64 acceptance_altitude_tolerance # Tolérance altitude (m)
+float64 acceptance_yaw_tolerance # Tolérance orientation (rad)
+string coordinate_frame    # Référentiel: GLOBAL, LOCAL, RELATIVE
+bool maintain_altitude     # Maintenir altitude constante
+string operator_id         # ID opérateur
+---
+# Result - Résultat de navigation
+bool success               # Succès navigation
+string completion_status   # Statut: REACHED, TIMEOUT, OBSTACLE, ABORTED, FAILED
+geometry_msgs/Point final_position # Position finale atteinte
+float64 final_altitude     # Altitude finale (m)
+float64 final_yaw          # Orientation finale (rad)
+float64 position_error_m   # Erreur position (m)
+float64 altitude_error_m   # Erreur altitude (m)
+float64 yaw_error_rad      # Erreur orientation (rad)
+float64 navigation_time_seconds # Temps navigation (s)
+float64 distance_traveled_m # Distance parcourue (m)
+float64 average_speed_ms   # Vitesse moyenne (m/s)
+uint32 obstacles_encountered # Obstacles rencontrés
+string[] path_deviations   # Déviations chemin
+string[] warnings          # Avertissements
+string[] errors            # Erreurs
+builtin_interfaces/Time completion_timestamp # Horodatage achèvement
+---
+# Feedback - Retour navigation en temps réel
+geometry_msgs/Point current_position # Position courante
+float64 current_altitude   # Altitude courante (m)
+float64 current_yaw        # Orientation courante (rad)
+float64 distance_to_target_m # Distance à la cible (m)
+float64 altitude_to_target_m # Différence altitude cible (m)
+float64 yaw_to_target_rad  # Différence orientation cible (rad)
+float64 current_speed_ms   # Vitesse courante (m/s)
+geometry_msgs/Vector3 current_velocity # Vélocité courante
+float64 estimated_time_to_arrival_s # Temps arrivée estimé (s)
+string navigation_status   # Statut navigation courante
+bool obstacles_detected    # Obstacles détectés
+string[] active_maneuvers  # Manœuvres actives
+float64 path_deviation_m   # Déviation chemin (m)
+builtin_interfaces/Time feedback_timestamp # Horodatage feedback

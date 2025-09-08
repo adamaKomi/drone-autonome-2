@@ -1,0 +1,29 @@
+# Service de retour au lancement
+# Commande le retour automatique au point de lancement
+
+# Requête
+float64 return_altitude   # Altitude retour (m)
+float64 return_speed      # Vitesse retour (m/s)
+bool auto_land           # Atterrissage automatique
+bool use_safe_path       # Utiliser chemin sécurisé
+string return_mode       # DIRECT, SAFE_PATH, EMERGENCY, ABORT_MISSION
+bool preserve_mission    # Préserver état mission
+geometry_msgs/Point override_home_position # Position accueil alternative
+string operator_id       # ID opérateur
+bool force_return        # Forcer retour même avec avertissements
+---
+# Réponse
+bool success             # Succès retour lancement
+string message           # Message retour
+geometry_msgs/Point home_position # Position accueil
+float64 return_distance_m # Distance retour (m)
+float64 estimated_time_seconds # Temps estimé (s)
+string[] warnings        # Avertissements
+string[] errors          # Erreurs
+bool landing_initiated   # Atterrissage initié
+string actual_return_mode # Mode retour effectif
+float64 battery_required_percent # Batterie nécessaire %
+string[] path_obstacles  # Obstacles sur chemin
+bool mission_preserved   # Mission préservée
+builtin_interfaces/Time rtl_timestamp # Horodatage RTL
+bool safe_path_available # Chemin sécurisé disponible

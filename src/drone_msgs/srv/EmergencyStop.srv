@@ -1,0 +1,30 @@
+# Service d'arrêt d'urgence
+# Arrêt immédiat du drone avec mesures sécurité
+
+# Requête
+string emergency_type     # Type urgence: MOTOR_FAILURE, BATTERY_CRITICAL, COLLISION, WEATHER, HUMAN_SAFETY, SYSTEM_FAILURE
+bool immediate_stop       # Arrêt moteurs immédiat
+bool attempt_safe_landing # Tenter atterrissage sécurisé
+string emergency_reason   # Raison urgence détaillée
+geometry_msgs/Point emergency_location # Position urgence
+bool notify_authorities   # Notifier autorités
+string operator_id        # ID opérateur
+bool preserve_logs        # Préserver logs urgence
+bool activate_beacon      # Activer balise localisation
+---
+# Réponse
+bool success              # Succès arrêt urgence
+string message            # Message retour
+string emergency_action_taken # Action urgence prise
+geometry_msgs/Point stop_position # Position arrêt
+float64 stop_time_seconds # Temps arrêt (s)
+string[] warnings         # Avertissements
+string[] errors           # Erreurs
+bool safe_landing_achieved # Atterrissage sécurisé réussi
+bool motors_stopped       # Moteurs arrêtés
+bool authorities_notified # Autorités notifiées
+string[] safety_measures_activated # Mesures sécurité activées
+bool logs_preserved       # Logs préservés
+builtin_interfaces/Time emergency_timestamp # Horodatage urgence
+bool beacon_activated     # Balise activée
+float64 impact_severity   # Sévérité impact estimé
