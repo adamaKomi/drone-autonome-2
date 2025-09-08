@@ -2,10 +2,7 @@
 build/
 install/
 log/
-*logs/
-logs/*
-/logs/
-logs
+*logs
 __pycache__/
 *.egg-info/
 *.swp
@@ -37,3 +34,6 @@ venv/
 # Misc
 *.old
 *.orig
+
+
+bfg-*.jar
