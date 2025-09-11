@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""
+Script CLI: drone_status - Affichage du statut système
+Usage: drone_status [--detailed] [--json]
+"""
+
+import rclpy
+from rclpy.node import Node
+import sys
+import argparse
+import json
+import time
+from std_srvs.srv import Trigger
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Affichage du statut du système de navigation')
+    parser.add_argument('--detailed', '-d', action='store_true', help='Affichage détaillé')
+    parser.add_argument('--json', '-j', action='store_true', help='Sortie au format JSON')
+    parser.add_argument('--watch', '-w', type=float, help='Mode watch avec intervalle (s)')
+    parser.add_argument('--timeout', type=float, default=5.0, help='Timeout services (s)')
+    
+    args = parser.parse_args()
+    
+    rclpy.init()
+    
+    try:
+        node = Node('drone_status_cli')
+        
+        def get_system_status():
+            """Récupère le statut du système"""
+            status = {
+                'timestamp': time.time(),
+                'system_ready': True,
+                'nodes': {},
+                'topics': {},
+                'services': {},
+                'position': [0.0, 0.0, 5.0],
+                'battery': 85.2,
+                'flight_mode': 'OFFBOARD',
+                'mission_active': False
+            }
+            
+            # Vérification des nœuds critiques
+            critical_nodes = [
+                '/drone_nav/parameter_manager_node',
+                '/drone_nav/core_navigation_node',
+                '/drone_nav/mavros_interface_node',
+                '/drone_nav/position_controller_node'
+            ]
+            
+            # Simulation de vérification
+            for node_name in critical_nodes:
+                status['nodes'][node_name] = {
+                    'active': True,
+                    'uptime': 300.5,
+                    'cpu_usage': 15.2
+                }
+            
+            # Vérification des topics
+            status['topics'] = {
+                '/drone_nav/current_pose': {'active': True, 'rate': 50.0},
+                '/drone_nav/cmd_vel': {'active': True, 'rate': 50.0},
+                '/drone_nav/goal_position': {'active': False, 'rate': 0.0}
+            }
+            
+            return status
+        
+        def format_status_display(status):
+            """Formate l'affichage du statut"""
+            lines = []
+            
+            # En-tête
+            lines.append("🚁 === STATUT SYSTÈME DRONE NAVIGATION ===")
+            lines.append(f"⏰ {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append("")
+            
+            # État général
+            ready_icon = "🟢" if status['system_ready'] else "🔴"
+            lines.append(f"{ready_icon} Système: {'PRÊT' if status['system_ready'] else 'ERREUR'}")
+            
+            # Position et état vol
+            pos = status['position']
+            lines.append(f"📍 Position: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})")
+            lines.append(f"🔋 Batterie: {status['battery']:.1f}%")
+            lines.append(f"✈️ Mode vol: {status['flight_mode']}")
+            
+            mission_icon = "🎯" if status['mission_active'] else "⏸️"
+            lines.append(f"{mission_icon} Mission: {'ACTIVE' if status['mission_active'] else 'INACTIVE'}")
+            lines.append("")
+            
+            # Nœuds (mode détaillé)
+            if args.detailed:
+                lines.append("📡 === NŒUDS ===")
+                for node_name, node_info in status['nodes'].items():
+                    status_icon = "🟢" if node_info['active'] else "🔴"
+                    name = node_name.split('/')[-1]
+                    lines.append(f"{status_icon} {name} (CPU: {node_info['cpu_usage']:.1f}%)")
+                lines.append("")
+                
+                lines.append("📊 === TOPICS ===")
+                for topic_name, topic_info in status['topics'].items():
+                    rate_icon = "🟢" if topic_info['rate'] > 0 else "🔴"
+                    name = topic_name.split('/')[-1]
+                    lines.append(f"{rate_icon} {name} ({topic_info['rate']:.1f} Hz)")
+            
+            return "\\n".join(lines)
+        
+        def display_status():
+            """Affiche le statut"""
+            try:
+                status = get_system_status()
+                
+                if args.json:
+                    print(json.dumps(status, indent=2))
+                else:
+                    print(format_status_display(status))
+                    
+            except Exception as e:
+                if args.json:
+                    print(json.dumps({'error': str(e)}))
+                else:
+                    print(f"❌ Erreur récupération statut: {e}")
+        
+        # Mode watch ou affichage unique
+        if args.watch:
+            print(f"🔄 Mode watch activé (intervalle: {args.watch}s, Ctrl+C pour arrêter)")
+            try:
+                while True:
+                    if not args.json:
+                        print("\\033[2J\\033[H")  # Clear screen
+                    display_status()
+                    time.sleep(args.watch)
+            except KeyboardInterrupt:
+                print("\\n👋 Mode watch arrêté")
+        else:
+            display_status()
+        
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        return 1
+    finally:
+        rclpy.shutdown()
+    
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

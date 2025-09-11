@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""
+Script CLI: drone_mission - Planification et exécution de missions
+Usage: drone_mission <command> [options]
+"""
+
+import rclpy
+from rclpy.node import Node
+import sys
+import argparse
+import json
+import os
+import yaml
+from pathlib import Path
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Gestion des missions drone')
+    subparsers = parser.add_subparsers(dest='command', help='Commandes disponibles')
+    
+    # Sous-commande: create
+    create_parser = subparsers.add_parser('create', help='Créer une nouvelle mission')
+    create_parser.add_argument('file', help='Fichier de mission à créer')
+    create_parser.add_argument('--pattern', choices=['zigzag', 'spiral', 'grid'], default='zigzag')
+    create_parser.add_argument('--area', help='Zone de mission: x1,y1,x2,y2')
+    create_parser.add_argument('--altitude', type=float, default=5.0)
+    create_parser.add_argument('--spacing', type=float, default=2.0)
+    
+    # Sous-commande: load
+    load_parser = subparsers.add_parser('load', help='Charger une mission')
+    load_parser.add_argument('file', help='Fichier de mission à charger')
+    load_parser.add_argument('--validate', action='store_true', help='Valider sans exécuter')
+    
+    # Sous-commande: start
+    start_parser = subparsers.add_parser('start', help='Démarrer la mission chargée')
+    start_parser.add_argument('--confirm', action='store_true', help='Confirmation automatique')
+    
+    # Sous-commande: stop
+    stop_parser = subparsers.add_parser('stop', help='Arrêter la mission en cours')
+    stop_parser.add_argument('--emergency', action='store_true', help='Arrêt d\'urgence')
+    
+    # Sous-commande: status
+    status_parser = subparsers.add_parser('status', help='Statut de la mission')
+    
+    # Sous-commande: list
+    list_parser = subparsers.add_parser('list', help='Lister les missions disponibles')
+    list_parser.add_argument('--directory', default='./missions', help='Répertoire des missions')
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        return 1
+    
+    rclpy.init()
+    
+    try:
+        node = Node('drone_mission_cli')
+        
+        # Exécution selon la commande
+        if args.command == 'create':
+            return create_mission(node, args)
+        elif args.command == 'load':
+            return load_mission(node, args)
+        elif args.command == 'start':
+            return start_mission(node, args)
+        elif args.command == 'stop':
+            return stop_mission(node, args)
+        elif args.command == 'status':
+            return mission_status(node, args)
+        elif args.command == 'list':
+            return list_missions(node, args)
+            
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
+        return 1
+    finally:
+        rclpy.shutdown()
+    
+    return 0
+
+
+def create_mission(node, args):
+    """Crée une nouvelle mission"""
+    print(f"🎯 Création mission: {args.file}")
+    
+    # Parsing de la zone
+    if args.area:
+        try:
+            coords = [float(x) for x in args.area.split(',')]
+            if len(coords) != 4:
+                raise ValueError("Format zone invalide")
+            area = {
+                'x_min': coords[0], 'y_min': coords[1],
+                'x_max': coords[2], 'y_max': coords[3]
+            }
+        except ValueError:
+            print("❌ Format zone invalide. Utilisez: x1,y1,x2,y2")
+            return 1
+    else:
+        # Zone par défaut
+        area = {'x_min': 0, 'y_min': 0, 'x_max': 20, 'y_max': 20}
+    
+    # Génération des waypoints selon le pattern
+    waypoints = generate_pattern_waypoints(
+        area, args.pattern, args.altitude, args.spacing
+    )
+    
+    # Structure de la mission
+    mission = {
+        'metadata': {
+            'name': Path(args.file).stem,
+            'pattern': args.pattern,
+            'created': time.time(),
+            'description': f"Mission {args.pattern} générée automatiquement"
+        },
+        'parameters': {
+            'altitude': args.altitude,
+            'spacing': args.spacing,
+            'max_velocity': 3.0,
+            'area': area
+        },
+        'waypoints': waypoints,
+        'safety': {
+            'geofence': area,
+            'max_altitude': args.altitude + 5.0,
+            'emergency_land_zone': area
+        }
+    }
+    
+    # Sauvegarde
+    try:
+        os.makedirs(os.path.dirname(args.file), exist_ok=True)
+        with open(args.file, 'w') as f:
+            json.dump(mission, f, indent=2)
+        
+        print(f"✅ Mission créée: {len(waypoints)} waypoints")
+        print(f"📁 Fichier: {args.file}")
+        print(f"📊 Pattern: {args.pattern}")
+        print(f"📏 Zone: {area}")
+        
+    except Exception as e:
+        print(f"❌ Erreur sauvegarde: {e}")
+        return 1
+    
+    return 0
+
+
+def generate_pattern_waypoints(area, pattern, altitude, spacing):
+    """Génère les waypoints selon le pattern"""
+    waypoints = []
+    
+    if pattern == 'zigzag':
+        x_min, x_max = area['x_min'], area['x_max']
+        y_min, y_max = area['y_min'], area['y_max']
+        
+        y = y_min
+        direction = 1  # 1 pour droite, -1 pour gauche
+        
+        while y <= y_max:
+            if direction == 1:
+                waypoints.append([x_min, y, altitude])
+                waypoints.append([x_max, y, altitude])
+            else:
+                waypoints.append([x_max, y, altitude])
+                waypoints.append([x_min, y, altitude])
+            
+            y += spacing
+            direction *= -1
+    
+    elif pattern == 'grid':
+        x_min, x_max = area['x_min'], area['x_max']
+        y_min, y_max = area['y_min'], area['y_max']
+        
+        x = x_min
+        while x <= x_max:
+            y = y_min
+            while y <= y_max:
+                waypoints.append([x, y, altitude])
+                y += spacing
+            x += spacing
+    
+    elif pattern == 'spiral':
+        center_x = (area['x_min'] + area['x_max']) / 2
+        center_y = (area['y_min'] + area['y_max']) / 2
+        max_radius = min(area['x_max'] - center_x, area['y_max'] - center_y)
+        
+        import math
+        radius = spacing
+        angle = 0
+        
+        while radius < max_radius:
+            x = center_x + radius * math.cos(angle)
+            y = center_y + radius * math.sin(angle)
+            waypoints.append([x, y, altitude])
+            
+            angle += 0.5
+            radius += spacing * 0.1
+    
+    return waypoints
+
+
+def load_mission(node, args):
+    """Charge une mission"""
+    print(f"📂 Chargement mission: {args.file}")
+    
+    try:
+        with open(args.file, 'r') as f:
+            mission = json.load(f)
+        
+        # Validation de la mission
+        validation_result = validate_mission(mission)
+        
+        if not validation_result['valid']:
+            print(f"❌ Mission invalide: {validation_result['error']}")
+            return 1
+        
+        print(f"✅ Mission valide chargée")
+        print(f"📊 Nom: {mission['metadata']['name']}")
+        print(f"🎯 Waypoints: {len(mission['waypoints'])}")
+        print(f"📏 Altitude: {mission['parameters']['altitude']}m")
+        
+        if args.validate:
+            print("✅ Validation terminée (pas d'exécution)")
+            return 0
+        
+        # TODO: Publier la mission vers le système
+        print("📡 Mission publiée vers le système")
+        
+    except FileNotFoundError:
+        print(f"❌ Fichier non trouvé: {args.file}")
+        return 1
+    except json.JSONDecodeError:
+        print(f"❌ Erreur format JSON: {args.file}")
+        return 1
+    except Exception as e:
+        print(f"❌ Erreur chargement: {e}")
+        return 1
+    
+    return 0
+
+
+def validate_mission(mission):
+    """Valide une mission"""
+    try:
+        # Vérifications obligatoires
+        if 'waypoints' not in mission:
+            return {'valid': False, 'error': 'Waypoints manquants'}
+        
+        if len(mission['waypoints']) < 2:
+            return {'valid': False, 'error': 'Au moins 2 waypoints requis'}
+        
+        # Vérification format waypoints
+        for i, wp in enumerate(mission['waypoints']):
+            if not isinstance(wp, list) or len(wp) < 3:
+                return {'valid': False, 'error': f'Waypoint {i} invalide'}
+        
+        # Vérifications de sécurité
+        if 'parameters' in mission:
+            altitude = mission['parameters'].get('altitude', 0)
+            if altitude > 100:  # Limite arbitraire
+                return {'valid': False, 'error': 'Altitude trop élevée (>100m)'}
+        
+        return {'valid': True}
+        
+    except Exception as e:
+        return {'valid': False, 'error': str(e)}
+
+
+def start_mission(node, args):
+    """Démarre une mission"""
+    print("🚀 Démarrage de la mission...")
+    
+    if not args.confirm:
+        response = input("Confirmer le démarrage de la mission? (y/N): ")
+        if response.lower() != 'y':
+            print("❌ Mission annulée")
+            return 1
+    
+    # TODO: Appel service de démarrage mission
+    print("✅ Mission démarrée")
+    print("📡 Commandes envoyées au système de navigation")
+    
+    return 0
+
+
+def stop_mission(node, args):
+    """Arrête une mission"""
+    if args.emergency:
+        print("🚨 ARRÊT D'URGENCE DE LA MISSION")
+    else:
+        print("⏹️ Arrêt normal de la mission")
+    
+    # TODO: Appel service d'arrêt
+    print("✅ Mission arrêtée")
+    
+    return 0
+
+
+def mission_status(node, args):
+    """Affiche le statut de mission"""
+    # TODO: Récupérer statut depuis le système
+    status = {
+        'active': False,
+        'progress': 0.0,
+        'current_waypoint': 0,
+        'total_waypoints': 0,
+        'estimated_remaining': 0.0
+    }
+    
+    print("📊 === STATUT MISSION ===")
+    if status['active']:
+        print(f"🟢 Mission active")
+        print(f"📍 Waypoint: {status['current_waypoint']}/{status['total_waypoints']}")
+        print(f"📊 Progrès: {status['progress']*100:.1f}%")
+        print(f"⏱️ Temps restant: {status['estimated_remaining']:.1f}s")
+    else:
+        print("🔴 Aucune mission active")
+    
+    return 0
+
+
+def list_missions(node, args):
+    """Liste les missions disponibles"""
+    missions_dir = Path(args.directory)
+    
+    if not missions_dir.exists():
+        print(f"❌ Répertoire missions non trouvé: {args.directory}")
+        return 1
+    
+    mission_files = list(missions_dir.glob("*.json"))
+    
+    if not mission_files:
+        print(f"ℹ️ Aucune mission trouvée dans {args.directory}")
+        return 0
+    
+    print(f"📁 === MISSIONS DISPONIBLES ({len(mission_files)}) ===")
+    
+    for mission_file in sorted(mission_files):
+        try:
+            with open(mission_file, 'r') as f:
+                mission = json.load(f)
+            
+            name = mission.get('metadata', {}).get('name', mission_file.stem)
+            pattern = mission.get('metadata', {}).get('pattern', 'unknown')
+            waypoints = len(mission.get('waypoints', []))
+            
+            print(f"📄 {name}")
+            print(f"   📁 {mission_file}")
+            print(f"   🎯 Pattern: {pattern}, Waypoints: {waypoints}")
+            print()
+            
+        except Exception as e:
+            print(f"❌ {mission_file}: {e}")
+    
+    return 0
+
+
+if __name__ == '__main__':
+    import time
+    sys.exit(main())

@@ -8,6 +8,9 @@ sim_vehicle.py -v ArduCopter --console --map --out=127.0.0.1:14550
 ```bash
 sim_vehicle.py -v ArduCopter --console --map --out=127.0.0.1:14550
 ```
+```bash
+sim_vehicle.py -v ArduCopter --console --out=127.0.0.1:14550
+```
 Ce simulateur démarre un drone virtuel et diffuse les données MAVLink sur le port 14550.
 
 ## 2. Lancer MAVROS (ROS2)
