@@ -41,6 +41,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PerformanceMetrics.msg"
   "msg/SystemAlert.msg"
   "msg/DiagnosticInfo.msg"
+  "msg/NavigationStatus.msg"
+  "msg/PathProgress.msg"
   
   # Services
   "srv/ArmDrone.srv"
@@ -67,6 +69,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SystemDiagnostic.srv"
   "srv/Takeoff.srv"
   "srv/UpdateParameters.srv"
+  "srv/GotoPosition.srv"
+  "srv/GotoLocal.srv"
   
   # Actions
   "action/CollectData.action"
@@ -78,6 +82,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/NavigateToPosition.action"
   "action/PerformMaintenance.action"
   "action/SearchAndPollinate.action"
+  "action/GotoPositionAction.action"
   
   DEPENDENCIES
   std_msgs
