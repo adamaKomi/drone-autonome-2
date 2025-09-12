@@ -1,5 +1,6 @@
 # drone_navigation/setup.py
 from setuptools import setup, find_packages
+from glob import glob
 
 package_name = 'drone_navigation'
 
@@ -11,11 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['launch/navigation_complete.launch.py']),
-        ('share/' + package_name + '/launch', ['launch/navigation_test.launch.py']),
-        ('share/' + package_name + '/config', ['config/drone_config.yaml']),
-        ('share/' + package_name + '/config', ['config/navigation_params.yaml']),
-        ('share/' + package_name + '/config', ['config/pid_tuning.yaml']),
+        ('share/drone_navigation/launch', glob('launch/*.launch.py')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -26,19 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            # Micro-nœuds principaux
-            'parameter_manager_node = drone_navigation.nodes.parameter_manager_node:main',
-            'mavros_interface_node = drone_navigation.nodes.mavros_interface_node:main',
-            'core_navigation_node = drone_navigation.nodes.core_navigation_node:main',
-            'trajectory_planner_node = drone_navigation.nodes.trajectory_planner_node:main',
-            'coverage_pattern_node = drone_navigation.nodes.coverage_pattern_node:main',
-            'path_optimizer_node = drone_navigation.nodes.path_optimizer_node:main',
-            'position_controller_node = drone_navigation.nodes.position_controller_node:main',
-            'trajectory_follower_node = drone_navigation.nodes.trajectory_follower_node:main',
-            'cli_bridge_node = drone_navigation.nodes.cli_bridge_node:main',
-            
-            # Outils CLI
-            'drone-status = drone_navigation.cli.status:main',
+            'goto_position_node = drone_navigation.nodes.goto_position_node:main',
         ],
     },
 )
