@@ -1,0 +1,9 @@
+# CancelNavigation.srv
+# Request
+bool emergency_stop  # optionnel, arrêt immédiat vs position hold
+---
+# Response
+bool success
+string message
+string previous_target
+float64 progress

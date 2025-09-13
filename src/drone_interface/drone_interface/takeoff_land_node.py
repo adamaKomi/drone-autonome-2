@@ -97,6 +97,7 @@ class TakeoffLandNode(Node):
             10
         )
 
+
     def local_pose_callback(self, msg):
         self.local_pose = msg
 

@@ -1,3 +1,4 @@
+# NavigationStatus
 builtin_interfaces/Time stamp
 string status             # "IDLE", "NAVIGATING", "SUCCEEDED", "FAILED", "ABORTED"
 string mode              # "GPS", "LOCAL" 

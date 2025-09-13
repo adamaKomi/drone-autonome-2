@@ -2,6 +2,7 @@ float64 latitude
 float64 longitude
 float64 altitude
 float64 yaw_angle  # optionnel, angle de lacet désiré
+float64 tolerance
 ---
 bool success
 string message
