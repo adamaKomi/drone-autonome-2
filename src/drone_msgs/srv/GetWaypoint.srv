@@ -1,4 +1,5 @@
-# Pause the current mission
+uint32 index
 ---
+Waypoint waypoint
 bool success
 string message

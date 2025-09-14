@@ -1,0 +1,6 @@
+# Get the next waypoint in sequence
+---
+Waypoint waypoint
+bool success
+string message
+bool mission_completed

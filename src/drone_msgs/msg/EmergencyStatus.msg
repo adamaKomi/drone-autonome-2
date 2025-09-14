@@ -1,0 +1,5 @@
+builtin_interfaces/Time stamp
+string state
+string reason
+float32 battery_level
+bool requires_immediate_action

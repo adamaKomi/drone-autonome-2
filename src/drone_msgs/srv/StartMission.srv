@@ -1,29 +1,4 @@
-# Service de démarrage de mission
-# Lance l'exécution d'une mission chargée
-
-# Requête
-string mission_id         # ID mission à démarrer
-bool auto_takeoff        # Décollage automatique
-float64 start_delay_seconds # Délai démarrage (s)
-string start_mode        # Mode démarrage: NORMAL, RESUME, RESTART, TEST
-uint32 start_waypoint_index # Index waypoint démarrage
-bool confirm_start       # Confirmation démarrage requis
-string operator_id       # ID opérateur
-bool override_weather    # Ignorer conditions météo
-string[] override_checks # Vérifications à ignorer
+# Service pour démarrer une mission
 ---
-# Réponse
-bool success             # Succès démarrage mission
-string message           # Message retour
-string active_mission_id # ID mission active
-string mission_status    # Statut mission
-uint32 current_waypoint_index # Index waypoint courant
-float64 mission_progress_percent # Progression mission %
-string[] warnings        # Avertissements
-string[] errors          # Erreurs
-bool takeoff_completed   # Décollage complété
-builtin_interfaces/Time start_timestamp # Horodatage démarrage
-float64 estimated_completion_time_minutes # Temps achèvement estimé (min)
-geometry_msgs/Point current_target # Cible courante
-bool weather_check_passed # Vérification météo réussie
-string[] active_safety_measures # Mesures sécurité actives
+bool success
+string message

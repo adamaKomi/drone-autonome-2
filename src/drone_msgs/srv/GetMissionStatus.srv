@@ -1,0 +1,5 @@
+# Get current mission status
+---
+MissionStatus status
+bool success
+string message

@@ -1,28 +1,4 @@
-# Service d'arrêt de mission
-# Arrête l'exécution de la mission courante
-
-# Requête
-string mission_id         # ID mission à arrêter
-string stop_reason       # Raison arrêt
-bool save_progress       # Sauvegarder progression
-bool return_to_launch    # Retour lancement après arrêt
-string stop_mode         # Mode arrêt: IMMEDIATE, COMPLETE_CURRENT_TASK, SAFE_POINT
-bool preserve_mission_data # Préserver données mission
-string operator_id       # ID opérateur
-bool emergency_stop      # Arrêt urgence
+# Service pour arrêter une mission
 ---
-# Réponse
-bool success             # Succès arrêt mission
-string message           # Message retour
-string stopped_mission_id # ID mission arrêtée
-float64 mission_progress_percent # Progression finale %
-uint32 completed_waypoints # Waypoints complétés
-uint32 completed_tasks   # Tâches complétées
-string[] warnings        # Avertissements
-string[] errors          # Erreurs
-bool progress_saved      # Progression sauvegardée
-bool returning_to_launch # Retour lancement en cours
-geometry_msgs/Point stop_position # Position arrêt
-builtin_interfaces/Time stop_timestamp # Horodatage arrêt
-string mission_final_status # Statut final mission
-bool mission_data_preserved # Données mission préservées
+bool success
+string message

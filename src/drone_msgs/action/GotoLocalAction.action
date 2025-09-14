@@ -1,0 +1,17 @@
+# Goal
+float64 x
+float64 y
+float64 z
+float64 yaw_angle
+float64 tolerance
+---
+# Result
+bool success
+string message
+geometry_msgs/Point final_position
+---
+# Feedback
+float64 progress
+float64 distance_remaining
+geometry_msgs/Point current_position
+string current_status

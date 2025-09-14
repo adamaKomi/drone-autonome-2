@@ -1,4 +1,4 @@
-# Pause the current mission
+# Clear all waypoints
 ---
 bool success
 string message

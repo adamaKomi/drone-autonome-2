@@ -1,4 +1,4 @@
-# Pause the current mission
+# Resume a paused mission
 ---
 bool success
 string message

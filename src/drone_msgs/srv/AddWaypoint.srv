@@ -1,0 +1,5 @@
+Waypoint waypoint
+uint32 index                 # Optional index (if -1, append to end)
+---
+bool success
+string message

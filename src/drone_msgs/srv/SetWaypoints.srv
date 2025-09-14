@@ -1,4 +1,4 @@
-# Pause the current mission
+Waypoint[] waypoints
 ---
 bool success
 string message

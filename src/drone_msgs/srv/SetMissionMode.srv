@@ -1,0 +1,5 @@
+# Set mission execution mode
+string mode  # SEQUENTIAL, LOOP, BACKTRACK
+---
+bool success
+string message

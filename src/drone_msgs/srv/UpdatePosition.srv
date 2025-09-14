@@ -1,14 +1,8 @@
-# UpdatePosition.srv
-# Request
 float64 latitude
 float64 longitude
 float64 altitude
 float64 yaw_angle
 float64 tolerance
-bool   smooth_transition
-float64 transition_time
 ---
-# Response  
 bool success
 string message
-float64 remaining_distance

@@ -1,0 +1,5 @@
+# Get the current list of waypoints
+---
+Waypoint[] waypoints
+bool success
+string message
