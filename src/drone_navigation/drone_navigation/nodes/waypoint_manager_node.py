@@ -23,19 +23,30 @@ class WaypointManagerNode(Node):
     def __init__(self):
         super().__init__('waypoint_manager_node')
         
-        # Thread safety
+    # Thread safety
+    # _state_lock : protège l'accès concurrent aux waypoints et à l'état de mission
+    # _publish_lock : protège la publication sur les topics
+    # _file_lock : protège les opérations de lecture/écriture de fichiers
+    # _executor : exécute les tâches longues (publication, sauvegarde)
         self._state_lock = threading.RLock()
         self._publish_lock = threading.RLock()
         self._file_lock = threading.RLock()  # Pour les opérations fichiers
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wp_mgr")
         
-        # Configuration protégée
+    # Configuration protégée
+    # _waypoints : liste des waypoints en mémoire
+    # _current_mission_id : identifiant de la mission courante
+    # _waypoints_file : nom du fichier de waypoints utilisé
+    # _mission_active : indique si une mission est en cours
         self._waypoints = []
         self._current_mission_id = None
         self._waypoints_file = None
         self._mission_active = False
         
-        # Paramètres
+    # Paramètres
+    # default_waypoints_dir : répertoire par défaut pour les fichiers de waypoints
+    # auto_save : active la sauvegarde automatique à la fin de mission
+    # publish_rate : fréquence de publication de la liste des waypoints
         self.declare_parameter('default_waypoints_dir', './waypoints')
         self.declare_parameter('auto_save', True)
         self.declare_parameter('publish_rate', 2.0)
@@ -52,17 +63,21 @@ class WaypointManagerNode(Node):
             self._waypoints_dir = "./waypoints_fallback"
             os.makedirs(self._waypoints_dir, exist_ok=True)
         
-        # Publishers thread-safe
+    # Publishers thread-safe
+    # _waypoints_list_pub : publie la liste complète des waypoints
         self._waypoints_list_pub = self.create_publisher(
             WaypointList, '/drone_nav/waypoints_list', 10
         )
         
-        # Subscribers
+    # Subscribers
+    # /drone_nav/mission_status : reçoit le statut de la mission pour déclencher auto-sauvegarde
         self.create_subscription(
             MissionStatus, '/drone_nav/mission_status', self._mission_status_callback, 10
         )
         
-        # Services de fichiers
+    # Services de fichiers
+    # /drone_nav/load_waypoints : charge les waypoints depuis un fichier
+    # /drone_nav/save_waypoints : sauvegarde les waypoints vers un fichier
         self._load_waypoints_srv = self.create_service(
             LoadWaypoints, '/drone_nav/load_waypoints', self._handle_load_waypoints
         )
@@ -70,7 +85,11 @@ class WaypointManagerNode(Node):
             SaveWaypoints, '/drone_nav/save_waypoints', self._handle_save_waypoints
         )
         
-        # Services de waypoints individuels
+    # Services de waypoints individuels
+    # /drone_nav/get_waypoint : obtient un waypoint par index
+    # /drone_nav/add_waypoint_local : ajoute un waypoint
+    # /drone_nav/remove_waypoint_local : supprime un waypoint
+    # /drone_nav/clear_waypoints_local : supprime tous les waypoints
         self._get_waypoint_srv = self.create_service(
             GetWaypoint, '/drone_nav/get_waypoint', self._handle_get_waypoint
         )
@@ -84,7 +103,9 @@ class WaypointManagerNode(Node):
             ClearWaypoints, '/drone_nav/clear_waypoints_local', self._handle_clear_waypoints
         )
         
-        # Services de gestion de liste
+    # Services de gestion de liste
+    # /drone_nav/get_waypoints_local : obtient la liste complète
+    # /drone_nav/set_waypoints_local : définit la liste complète
         self._get_waypoints_srv = self.create_service(
             GetWaypoints, '/drone_nav/get_waypoints_local', self._handle_get_waypoints
         )
@@ -92,7 +113,8 @@ class WaypointManagerNode(Node):
             SetWaypoints, '/drone_nav/set_waypoints_local', self._handle_set_waypoints
         )
         
-        # Timer pour publication périodique
+    # Timer pour publication périodique
+    # Publie périodiquement la liste des waypoints
         self._publish_timer = self.create_timer(
             1.0 / publish_rate, 
             self._publish_timer_callback
@@ -101,6 +123,7 @@ class WaypointManagerNode(Node):
         self.get_logger().info("Waypoint Manager Node initialized")
 
     # Propriétés thread-safe
+    # Les propriétés suivantes protègent l'accès concurrent aux variables d'état
     @property
     def waypoints_count(self):
         with self._state_lock:
@@ -112,6 +135,7 @@ class WaypointManagerNode(Node):
             return self._mission_active
 
     def _mission_status_callback(self, msg):
+        # Callback appelé à chaque changement de statut de mission
         """Callback pour le statut de mission"""
         with self._state_lock:
             previous_active = self._mission_active
@@ -123,6 +147,7 @@ class WaypointManagerNode(Node):
                     self._executor.submit(self._auto_save_waypoints)
 
     def _auto_save_waypoints(self):
+        # Sauvegarde automatique des waypoints à la fin de mission
         """Sauvegarde automatique des waypoints"""
         try:
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -133,6 +158,7 @@ class WaypointManagerNode(Node):
             self.get_logger().error(f"Erreur auto-sauvegarde: {e}")
 
     def _publish_timer_callback(self):
+        # Timer : déclenche la publication périodique de la liste des waypoints
         """Callback du timer de publication"""
         try:
             self._executor.submit(self._publish_waypoints_list)
@@ -140,6 +166,7 @@ class WaypointManagerNode(Node):
             self.get_logger().error(f"Erreur soumission publication: {e}")
 
     def _publish_waypoints_list(self):
+        # Publie la liste complète des waypoints sur le topic dédié
         """Publication thread-safe de la liste des waypoints"""
         try:
             with self._state_lock:
@@ -156,7 +183,9 @@ class WaypointManagerNode(Node):
             self.get_logger().error(f"Erreur publication liste waypoints: {e}")
 
     # Handlers de services - Fichiers
+    # Les méthodes suivantes gèrent le chargement et la sauvegarde de fichiers de waypoints
     def _handle_load_waypoints(self, request, response):
+        # Service : charge les waypoints depuis un fichier JSON
         """Service de chargement de waypoints depuis fichier"""
         try:
             filename = request.filename.strip()
@@ -181,6 +210,7 @@ class WaypointManagerNode(Node):
         return response
 
     def _handle_save_waypoints(self, request, response):
+        # Service : sauvegarde les waypoints vers un fichier JSON
         """Service de sauvegarde de waypoints vers fichier"""
         try:
             filename = request.filename.strip()
@@ -202,7 +232,9 @@ class WaypointManagerNode(Node):
         return response
 
     # Handlers de services - Waypoints individuels
+    # Les méthodes suivantes gèrent l'accès et la modification des waypoints un par un
     def _handle_get_waypoint(self, request, response):
+        # Service : obtient un waypoint par index
         """Service d'obtention d'un waypoint par index"""
         try:
             with self._state_lock:
@@ -222,6 +254,7 @@ class WaypointManagerNode(Node):
         return response
 
     def _handle_add_waypoint(self, request, response):
+        # Service : ajoute un waypoint à la liste
         """Service d'ajout de waypoint"""
         try:
             with self._state_lock:
@@ -250,6 +283,7 @@ class WaypointManagerNode(Node):
         return response
 
     def _handle_remove_waypoint(self, request, response):
+        # Service : supprime un waypoint par index
         """Service de suppression de waypoint"""
         try:
             with self._state_lock:
@@ -277,6 +311,7 @@ class WaypointManagerNode(Node):
         return response
 
     def _handle_clear_waypoints(self, request, response):
+        # Service : supprime tous les waypoints
         """Service de suppression de tous les waypoints"""
         try:
             with self._state_lock:
@@ -300,7 +335,9 @@ class WaypointManagerNode(Node):
         return response
 
     # Handlers de services - Gestion de liste
+    # Les méthodes suivantes gèrent l'accès et la modification de la liste complète des waypoints
     def _handle_get_waypoints(self, request, response):
+        # Service : obtient la liste complète des waypoints
         """Service d'obtention de tous les waypoints"""
         try:
             with self._state_lock:
@@ -315,6 +352,7 @@ class WaypointManagerNode(Node):
         return response
 
     def _handle_set_waypoints(self, request, response):
+        # Service : définit la liste complète des waypoints
         """Service de définition de la liste complète des waypoints"""
         try:
             with self._state_lock:
@@ -336,7 +374,9 @@ class WaypointManagerNode(Node):
         return response
 
     # Méthodes de gestion de fichiers
+    # Les méthodes suivantes gèrent la lecture et l'écriture des fichiers JSON de waypoints
     def _load_waypoints_from_file(self, filename):
+        # Charge les waypoints depuis un fichier JSON
         """Charge les waypoints depuis un fichier JSON"""
         try:
             with self._file_lock:
@@ -389,6 +429,7 @@ class WaypointManagerNode(Node):
             return False, f"Erreur chargement: {e}", 0
 
     def _save_waypoints_to_file(self, filename):
+        # Sauvegarde les waypoints vers un fichier JSON
         """Sauvegarde les waypoints vers un fichier JSON"""
         try:
             with self._file_lock:
@@ -434,7 +475,9 @@ class WaypointManagerNode(Node):
             return False, f"Erreur sauvegarde: {e}", 0
 
     # Méthodes publiques utilitaires
+    # Les méthodes suivantes permettent d'accéder aux waypoints depuis d'autres nœuds
     def get_waypoint(self, index):
+        # Retourne un waypoint par index
         """Obtenir un waypoint par index (méthode publique)"""
         with self._state_lock:
             if 0 <= index < len(self._waypoints):
@@ -442,15 +485,18 @@ class WaypointManagerNode(Node):
             return None
 
     def get_waypoints_count(self):
+        # Retourne le nombre de waypoints
         """Obtenir le nombre de waypoints (méthode publique)"""
         return self.waypoints_count
 
     def get_waypoints_list(self):
+        # Retourne une copie de la liste des waypoints
         """Obtenir une copie de la liste des waypoints (méthode publique)"""
         with self._state_lock:
             return list(self._waypoints)
 
     def destroy_node(self):
+        # Nettoyage du nœud : arrêt du ThreadPoolExecutor
         """Nettoyage lors de la destruction du nœud"""
         try:
             if hasattr(self, '_publish_timer'):
@@ -464,6 +510,7 @@ class WaypointManagerNode(Node):
             super().destroy_node()
 
 def main(args=None):
+    # Point d'entrée principal du nœud de gestion des waypoints
     rclpy.init(args=args)
     
     node = WaypointManagerNode()

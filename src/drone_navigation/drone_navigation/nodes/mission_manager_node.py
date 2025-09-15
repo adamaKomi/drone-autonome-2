@@ -15,7 +15,7 @@ from enum import Enum
 from drone_msgs.msg import MissionStatus, WaypointReached, Waypoint, NavigationStatus
 from drone_msgs.srv import (SetWaypoints, GetWaypoints, AddWaypoint, RemoveWaypoint, 
                            ClearWaypoints, PauseMission, ResumeMission, 
-                           GetMissionStatus, SetMissionMode)
+                           GetMissionStatus, SetMissionMode, GotoPosition, GotoLocal)
 from std_srvs.srv import Empty
 
 class MissionState(Enum):
@@ -34,12 +34,25 @@ class MissionManagerNode(Node):
     def __init__(self):
         super().__init__('mission_manager_node')
         
-        # Thread safety
+    # Thread safety
+    # _state_lock : protège l'accès concurrent à l'état de mission
+    # _publish_lock : protège la publication sur les topics
+    # _executor : exécute les tâches longues (supervision, publication)
         self._state_lock = threading.RLock()
         self._publish_lock = threading.RLock()
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="mission_mgr")
         
-        # État de la mission protégé
+    # État de la mission protégé
+    # _mission_state : état courant de la mission (IDLE, RUNNING, etc.)
+    # _mission_mode : mode de la mission (SEQUENTIAL, LOOP, BACKTRACK)
+    # _current_waypoint_index : index du waypoint courant
+    # _total_waypoints : nombre total de waypoints
+    # _loop_count : nombre de boucles effectuées
+    # _max_loops : nombre maximal de boucles
+    # _waypoints : liste des waypoints de la mission
+    # _mission_progress : progrès de la mission (0.0 à 1.0)
+    # _mission_start_time : timestamp de début de mission
+    # _navigation_active : indique si une navigation est en cours
         self._mission_state = MissionState.IDLE
         self._mission_mode = MissionMode.SEQUENTIAL
         self._current_waypoint_index = 0
@@ -51,14 +64,16 @@ class MissionManagerNode(Node):
         self._mission_start_time = None
         self._navigation_active = False
         
-        # Configuration
+    # Paramètres configurables (fréquence de publication, temps max de mission)
         self.declare_parameter('status_publish_rate', 1.0)
         self.declare_parameter('max_mission_time', 3600.0)
         
         status_rate = self.get_parameter('status_publish_rate').value
         self._max_mission_time = self.get_parameter('max_mission_time').value
         
-        # Publishers thread-safe
+    # Publishers thread-safe
+    # _mission_status_pub : publie le statut de la mission
+    # _waypoint_reached_pub : publie l'événement d'atteinte de waypoint
         self._mission_status_pub = self.create_publisher(
             MissionStatus, '/drone_nav/mission_status', 10
         )
@@ -66,12 +81,19 @@ class MissionManagerNode(Node):
             WaypointReached, '/drone_nav/waypoint_reached', 10
         )
         
-        # Subscribers
+    # Subscribers
+    # /drone_nav/status : reçoit le statut de navigation pour suivre la progression
         self.create_subscription(
-            NavigationStatus, '/drone_nav/gps_status', self._navigation_status_callback, 10
+            NavigationStatus, '/drone_nav/status', self._navigation_status_callback, 10
         )
         
-        # Services de mission
+    # Services de mission
+    # /drone_nav/start_mission : démarre la mission
+    # /drone_nav/stop_mission : arrête la mission
+    # /drone_nav/pause_mission : met la mission en pause
+    # /drone_nav/resume_mission : reprend la mission
+    # /drone_nav/get_mission_status : obtient le statut de la mission
+    # /drone_nav/set_mission_mode : change le mode de la mission
         self._start_mission_srv = self.create_service(
             Empty, '/drone_nav/start_mission', self._handle_start_mission
         )
@@ -91,35 +113,55 @@ class MissionManagerNode(Node):
             SetMissionMode, '/drone_nav/set_mission_mode', self._handle_set_mode
         )
         
-        # Services de waypoints
+    # Services de waypoints (mission level)
+    # /drone_nav/mission/set_waypoints : définit la liste des waypoints de la mission
+    # /drone_nav/mission/get_waypoints : obtient la liste des waypoints de la mission
+    # /drone_nav/mission/add_waypoint : ajoute un waypoint à la mission
+    # /drone_nav/mission/remove_waypoint : supprime un waypoint de la mission
+    # /drone_nav/mission/clear_waypoints : supprime tous les waypoints de la mission
         self._set_waypoints_srv = self.create_service(
-            SetWaypoints, '/drone_nav/set_waypoints', self._handle_set_waypoints
+            SetWaypoints, '/drone_nav/mission/set_waypoints', self._handle_set_waypoints
         )
         self._get_waypoints_srv = self.create_service(
-            GetWaypoints, '/drone_nav/get_waypoints', self._handle_get_waypoints
+            GetWaypoints, '/drone_nav/mission/get_waypoints', self._handle_get_waypoints
         )
         self._add_waypoint_srv = self.create_service(
-            AddWaypoint, '/drone_nav/add_waypoint', self._handle_add_waypoint
+            AddWaypoint, '/drone_nav/mission/add_waypoint', self._handle_add_waypoint
         )
         self._remove_waypoint_srv = self.create_service(
-            RemoveWaypoint, '/drone_nav/remove_waypoint', self._handle_remove_waypoint
+            RemoveWaypoint, '/drone_nav/mission/remove_waypoint', self._handle_remove_waypoint
         )
         self._clear_waypoints_srv = self.create_service(
-            ClearWaypoints, '/drone_nav/clear_waypoints', self._handle_clear_waypoints
+            ClearWaypoints, '/drone_nav/mission/clear_waypoints', self._handle_clear_waypoints
         )
         
-        # Timer pour la publication de statut
+    # Timer pour la publication de statut
+    # Publie périodiquement le statut de la mission
         self._status_timer = self.create_timer(
             1.0 / status_rate, 
             self._status_timer_callback
         )
         
-        # Timer pour la supervision de mission
+    # Timer pour la supervision de mission
+    # Supervise périodiquement l'état de la mission
         self._mission_timer = self.create_timer(0.5, self._mission_supervision_callback)
+        
+    # Clients pour commander les nœuds de navigation
+    # _gps_nav_client : client pour envoyer des commandes GPS
+    # _local_nav_client : client pour envoyer des commandes locales
+        self._gps_nav_client = self.create_client(GotoPosition, '/drone_nav/goto_position')
+        self._local_nav_client = self.create_client(GotoLocal, '/drone_nav/goto_local')
+        
+    # Clients pour interagir avec waypoint manager
+    # _wp_get_client : client pour obtenir les waypoints locaux
+    # _wp_set_client : client pour définir les waypoints locaux
+        self._wp_get_client = self.create_client(GetWaypoints, '/drone_nav/get_waypoints_local')
+        self._wp_set_client = self.create_client(SetWaypoints, '/drone_nav/set_waypoints_local')
         
         self.get_logger().info("Mission Manager Node initialized")
 
     # Propriétés thread-safe
+    # Les propriétés suivantes protègent l'accès concurrent aux variables d'état
     @property
     def mission_state(self):
         with self._state_lock:
@@ -141,6 +183,7 @@ class MissionManagerNode(Node):
             return self._total_waypoints
 
     def _navigation_status_callback(self, msg):
+        # Callback appelé à chaque changement de statut de navigation
         """Callback pour le statut de navigation"""
         with self._state_lock:
             previous_nav_active = self._navigation_active
@@ -157,6 +200,7 @@ class MissionManagerNode(Node):
                 self._executor.submit(self._handle_navigation_failed)
 
     def _handle_waypoint_reached(self):
+        # Gestion de l'événement d'atteinte de waypoint
         """Gestion de l'atteinte d'un waypoint"""
         try:
             with self._state_lock:
@@ -186,6 +230,7 @@ class MissionManagerNode(Node):
             self.get_logger().error(f"Erreur gestion waypoint atteint: {e}")
 
     def _handle_navigation_failed(self):
+        # Gestion de l'événement d'échec de navigation
         """Gestion de l'échec de navigation"""
         try:
             with self._state_lock:
@@ -197,6 +242,7 @@ class MissionManagerNode(Node):
             self.get_logger().error(f"Erreur gestion échec navigation: {e}")
 
     def _get_next_waypoint_index(self):
+        # Calcule l'index du prochain waypoint selon le mode de mission
         """Calcule l'index du prochain waypoint selon le mode"""
         if not self._waypoints:
             return None
@@ -227,6 +273,7 @@ class MissionManagerNode(Node):
         return None
 
     def _update_mission_progress(self):
+        # Met à jour le progrès de la mission
         """Met à jour le progrès de la mission"""
         if not self._waypoints:
             self._mission_progress = 0.0
@@ -242,6 +289,7 @@ class MissionManagerNode(Node):
             self._mission_progress = min(1.0, self._current_waypoint_index / max(1, len(self._waypoints)))
 
     def _mission_supervision_callback(self):
+        # Timer : supervise périodiquement la mission
         """Supervision périodique de la mission"""
         try:
             with self._state_lock:
@@ -256,6 +304,7 @@ class MissionManagerNode(Node):
             self.get_logger().error(f"Erreur supervision mission: {e}")
 
     def _check_mission_timeout(self):
+        # Vérifie si la mission a dépassé le temps maximal
         """Vérification du timeout de mission"""
         with self._state_lock:
             if (self._mission_start_time and 
@@ -264,11 +313,64 @@ class MissionManagerNode(Node):
                 self.get_logger().error("Mission échouée - Timeout dépassé")
 
     def _check_next_waypoint_dispatch(self):
+        # Vérifie si le prochain waypoint doit être envoyé
         """Vérifie si le prochain waypoint doit être envoyé"""
-        # Cette logique serait implémentée en coordination avec le waypoint_manager
-        pass
+        with self._state_lock:
+            if (self._mission_state == MissionState.RUNNING and 
+                not self._navigation_active and 
+                self._current_waypoint_index < len(self._waypoints)):
+                
+                # Obtenir le waypoint actuel
+                waypoint = self._waypoints[self._current_waypoint_index]
+                self.get_logger().info(f"Envoi waypoint {self._current_waypoint_index}: {waypoint.position}")
+                
+                # Déterminer si c'est GPS ou local
+                if abs(waypoint.position.x) > 90 or abs(waypoint.position.y) > 180:
+                    # Coordonnées locales (grandes valeurs)
+                    self._send_local_waypoint(waypoint)
+                else:
+                    # Coordonnées GPS (latitude/longitude)
+                    self._send_gps_waypoint(waypoint)
+
+    def _send_gps_waypoint(self, waypoint):
+        # Envoie un waypoint GPS au nœud de navigation GPS
+        """Envoie un waypoint GPS au nœud de navigation GPS"""
+        try:
+            if self._gps_nav_client.wait_for_service(timeout_sec=1.0):
+                request = GotoPosition.Request()
+                request.latitude = waypoint.position.x
+                request.longitude = waypoint.position.y
+                request.altitude = waypoint.position.z
+                request.yaw_angle = waypoint.yaw
+                request.tolerance = waypoint.tolerance
+                
+                future = self._gps_nav_client.call_async(request)
+                self.get_logger().info(f"Waypoint GPS envoyé: {waypoint.position.x}, {waypoint.position.y}")
+            else:
+                self.get_logger().warn("Service GPS navigation non disponible")
+        except Exception as e:
+            self.get_logger().error(f"Erreur envoi waypoint GPS: {e}")
+
+    def _send_local_waypoint(self, waypoint):
+        # Envoie un waypoint local au nœud de navigation locale
+        """Envoie un waypoint local au nœud de navigation locale"""
+        try:
+            if self._local_nav_client.wait_for_service(timeout_sec=1.0):
+                request = GotoLocal.Request()
+                request.x = waypoint.position.x
+                request.y = waypoint.position.y
+                request.z = waypoint.position.z
+                request.yaw_angle = waypoint.yaw
+                
+                future = self._local_nav_client.call_async(request)
+                self.get_logger().info(f"Waypoint local envoyé: {waypoint.position.x}, {waypoint.position.y}")
+            else:
+                self.get_logger().warn("Service navigation locale non disponible")
+        except Exception as e:
+            self.get_logger().error(f"Erreur envoi waypoint local: {e}")
 
     def _status_timer_callback(self):
+        # Timer : publie périodiquement le statut de la mission
         """Callback du timer de publication de statut"""
         try:
             self._executor.submit(self._publish_mission_status)
@@ -276,6 +378,7 @@ class MissionManagerNode(Node):
             self.get_logger().error(f"Erreur soumission publication statut: {e}")
 
     def _publish_mission_status(self):
+        # Publie le statut de la mission sur le topic dédié
         """Publication thread-safe du statut de mission"""
         try:
             with self._state_lock:
@@ -295,6 +398,7 @@ class MissionManagerNode(Node):
             self.get_logger().error(f"Erreur publication statut: {e}")
 
     def _publish_waypoint_reached(self, waypoint_index):
+        # Publie l'événement d'atteinte de waypoint
         """Publication thread-safe d'atteinte de waypoint"""
         try:
             msg = WaypointReached()
@@ -313,6 +417,7 @@ class MissionManagerNode(Node):
             self.get_logger().error(f"Erreur publication waypoint atteint: {e}")
 
     def _get_status_message(self):
+        # Génère un message descriptif du statut de la mission
         """Génère un message de statut descriptif"""
         if self._mission_state == MissionState.IDLE:
             return "En attente"
@@ -327,7 +432,9 @@ class MissionManagerNode(Node):
         return "État inconnu"
 
     # Handlers de services
+    # Les méthodes suivantes gèrent les services de mission et de waypoints
     def _handle_start_mission(self, request, response):
+        # Service : démarre la mission
         """Service de démarrage de mission"""
         try:
             with self._state_lock:
@@ -358,6 +465,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_stop_mission(self, request, response):
+        # Service : arrête la mission
         """Service d'arrêt de mission"""
         try:
             with self._state_lock:
@@ -376,6 +484,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_pause_mission(self, request, response):
+        # Service : met la mission en pause
         """Service de pause de mission"""
         try:
             with self._state_lock:
@@ -394,6 +503,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_resume_mission(self, request, response):
+        # Service : reprend la mission
         """Service de reprise de mission"""
         try:
             with self._state_lock:
@@ -412,6 +522,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_get_status(self, request, response):
+        # Service : obtient le statut de la mission
         """Service d'obtention du statut"""
         try:
             with self._state_lock:
@@ -436,6 +547,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_set_mode(self, request, response):
+        # Service : change le mode de la mission
         """Service de changement de mode"""
         try:
             new_mode = MissionMode(request.mode)
@@ -458,6 +570,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_set_waypoints(self, request, response):
+        # Service : définit la liste des waypoints de la mission
         """Service de définition des waypoints"""
         try:
             with self._state_lock:
@@ -478,6 +591,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_get_waypoints(self, request, response):
+        # Service : obtient la liste des waypoints de la mission
         """Service d'obtention des waypoints"""
         try:
             with self._state_lock:
@@ -492,6 +606,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_add_waypoint(self, request, response):
+        # Service : ajoute un waypoint à la mission
         """Service d'ajout de waypoint"""
         try:
             with self._state_lock:
@@ -512,6 +627,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_remove_waypoint(self, request, response):
+        # Service : supprime un waypoint de la mission
         """Service de suppression de waypoint"""
         try:
             with self._state_lock:
@@ -534,6 +650,7 @@ class MissionManagerNode(Node):
         return response
 
     def _handle_clear_waypoints(self, request, response):
+        # Service : supprime tous les waypoints de la mission
         """Service de suppression de tous les waypoints"""
         try:
             with self._state_lock:
@@ -554,6 +671,7 @@ class MissionManagerNode(Node):
         return response
 
     def destroy_node(self):
+        # Nettoyage du nœud : arrêt du ThreadPoolExecutor
         """Nettoyage lors de la destruction du nœud"""
         try:
             if hasattr(self, '_status_timer'):
@@ -569,6 +687,7 @@ class MissionManagerNode(Node):
             super().destroy_node()
 
 def main(args=None):
+    # Point d'entrée principal du nœud de gestion de mission
     rclpy.init(args=args)
     
     node = MissionManagerNode()

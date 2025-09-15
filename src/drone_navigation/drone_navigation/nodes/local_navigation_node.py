@@ -14,7 +14,7 @@ import math
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from tf_transformations import quaternion_from_euler
+from transforms3d.euler import euler2quat
 
 from drone_msgs.action import GotoLocalAction
 from drone_msgs.srv import GotoLocal, UpdateLocal
@@ -24,7 +24,13 @@ class LocalNavigationNode(Node):
     def __init__(self):
         super().__init__('local_navigation_node')
         
-        # État interne avec protection mutex
+    # État interne avec protection mutex
+    # _state_lock : protège l'accès aux variables d'état du nœud (navigation_active, target_position, etc.)
+    # _navigation_active : indique si une navigation locale est en cours
+    # _target_position : dictionnaire contenant la cible locale (x, y, z, yaw, tolerance)
+    # _current_pose : dernière position locale reçue du drone
+    # _safe_to_navigate : indique si la navigation est autorisée (donnée par le nœud de sécurité)
+    # _navigation_future : future de la tâche de navigation asynchrone
         self._state_lock = threading.RLock()
         self._navigation_active = False
         self._target_position = None
@@ -32,10 +38,10 @@ class LocalNavigationNode(Node):
         self._safe_to_navigate = False
         self._navigation_future = None
         
-        # ThreadPoolExecutor pour les tâches longues
+    # ThreadPoolExecutor pour les tâches longues (navigation asynchrone, feedback)
         self._executor = ThreadPoolExecutor(max_workers=2)
         
-        # Configuration
+    # Paramètres configurables (tolérance, vitesse, vitesse max)
         self.declare_parameter('default_tolerance', 1.0)
         self.declare_parameter('default_speed', 2.0)
         self.declare_parameter('max_velocity', 5.0)
@@ -44,32 +50,42 @@ class LocalNavigationNode(Node):
         self.default_speed = self.get_parameter('default_speed').value
         self.max_velocity = self.get_parameter('max_velocity').value
         
-        # Publishers avec protection
+    # Publishers avec protection
+    # setpoint_pub : publie la cible locale (PoseStamped) vers MAVROS
+    # progress_pub : publie la progression de la navigation (PathProgress)
+    # status_pub : publie le statut de la navigation (NavigationStatus)
         self._pub_lock = threading.Lock()
         self.setpoint_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', 10)
         self.progress_pub = self.create_publisher(PathProgress, '/drone_nav/progress', 10)
         self.status_pub = self.create_publisher(NavigationStatus, '/drone_nav/status', 10)
         
-        # Subscribers
+    # Subscribers
+    # /drone_nav/safe_to_navigate : reçoit l'état de sécurité du nœud safety
+    # /mavros/local_position/pose : reçoit la position locale du drone
         self.create_subscription(Bool, '/drone_nav/safe_to_navigate', self.safety_callback, 10)
         self.create_subscription(
             PoseStamped, '/mavros/local_position/pose', self.pose_callback,
             QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         )
         
-        # Services
+    # Services
+    # /drone_nav/goto_local : démarre une navigation locale vers une cible
+    # /drone_nav/update_local : met à jour la cible locale en cours
         self.goto_service = self.create_service(GotoLocal, '/drone_nav/goto_local', self.handle_goto_local)
         self.update_service = self.create_service(UpdateLocal, '/drone_nav/update_local', self.handle_update_local)
         
-        # Action Server avec la bonne action GotoLocalAction
+    # Action Server avec la bonne action GotoLocalAction
+    # Permet de recevoir des requêtes d'action pour navigation locale avec feedback
         self.action_server = ActionServer(self, GotoLocalAction, '/drone_nav/goto_local_action', self.execute_action)
         
-        # Timer pour setpoints
+    # Timer pour setpoints
+    # Publie périodiquement la cible locale vers MAVROS
         self.setpoint_timer = self.create_timer(0.1, self.publish_setpoint)
         
         self.get_logger().info("Local Navigation Node initialized with MultiThreadedExecutor")
 
     # Propriétés thread-safe
+    # Les propriétés suivantes protègent l'accès concurrent aux variables d'état
     @property
     def navigation_active(self):
         with self._state_lock:
@@ -111,12 +127,15 @@ class LocalNavigationNode(Node):
             self._safe_to_navigate = value
 
     def safety_callback(self, msg):
+        # Callback appelé à chaque message de sécurité reçu
         self.safe_to_navigate = msg.data
 
     def pose_callback(self, msg):
+        # Callback appelé à chaque message de position locale reçu
         self.current_pose = msg
 
     def handle_goto_local(self, request, response):
+        # Service : démarre une navigation locale si la sécurité est OK et aucune navigation en cours
         if not self.safe_to_navigate:
             response.success = False
             response.message = "Non sécurisé pour naviguer"
@@ -150,6 +169,7 @@ class LocalNavigationNode(Node):
         return response
 
     def handle_update_local(self, request, response):
+        # Service : met à jour la cible locale pendant une navigation active
         if not self.navigation_active:
             response.success = False
             response.message = "Aucune navigation active"
@@ -170,6 +190,7 @@ class LocalNavigationNode(Node):
         return response
 
     def execute_action(self, goal_handle):
+        # Action Server : exécute une navigation locale avec feedback et résultat
         # Utilise correctement les champs de GotoLocalAction
         tolerance = goal_handle.request.tolerance if goal_handle.request.tolerance > 0 else self.default_tolerance
         
@@ -208,6 +229,7 @@ class LocalNavigationNode(Node):
         return result
 
     def _navigate_with_feedback(self, goal_handle):
+        # Fonction interne : navigation locale avec feedback pour l'action
         try:
             for _ in range(600):  # 5 min timeout
                 if not self.safe_to_navigate or goal_handle.is_cancel_requested:
@@ -215,11 +237,13 @@ class LocalNavigationNode(Node):
                     return False
                 
                 distance = self.calculate_distance()
+                self.get_logger().info(f"===============[_navigate_with_feedback] Distance to target: {distance:.2f} meters ===============")
                 target = self.target_position
                 if not target:
                     break
                     
                 tolerance = target.get('tolerance', self.default_tolerance)
+                self.get_logger().info(f"===============[_navigate_with_feedback] Current tolerance: {tolerance:.2f} meters ===============")
                 
                 # Feedback thread-safe selon GotoLocalAction.Feedback
                 feedback = GotoLocalAction.Feedback()
@@ -239,53 +263,65 @@ class LocalNavigationNode(Node):
                 if distance <= tolerance:
                     self.navigation_active = False
                     self._safe_publish_status("SUCCEEDED")
+                    self._safe_publish_progress(distance, status="SUCCEEDED")
+                    self.get_logger().info("[_navigate_with_feedback] Navigation locale réussie")
                     return True
                 
-                self._safe_publish_progress(distance)
+                self._safe_publish_progress(distance, status="NAVIGATING")
                 time.sleep(0.5)
             
             self.navigation_active = False
             self._safe_publish_status("FAILED")
+            self._safe_publish_progress(0.0, status="FAILED")
             return False
             
         except Exception as e:
             self.get_logger().error(f"Erreur navigation locale: {e}")
             self.navigation_active = False
             self._safe_publish_status("FAILED")
+            self._safe_publish_progress(0.0, status="FAILED")
             return False
 
     def _navigate_to_position(self):
+        # Fonction interne : navigation locale sans feedback (service)
         try:
             for _ in range(600):  # 5 min timeout
                 if not self.safe_to_navigate:
                     break
                 
                 distance = self.calculate_distance()
+                self.get_logger().info(f"=============== Distance to target: {distance:.2f} meters ===============")
                 target = self.target_position
                 if not target:
                     break
                     
                 tolerance = target.get('tolerance', self.default_tolerance)
+                self.get_logger().info(f"=============== Current tolerance: {tolerance:.2f} meters ===============")
                 
                 if distance <= tolerance:
                     self.navigation_active = False
                     self._safe_publish_status("SUCCEEDED")
+                    self._safe_publish_progress(distance, status="SUCCEEDED")
+                    self.get_logger().info("Navigation locale réussie")
                     return True
                 
-                self._safe_publish_progress(distance)
+                self._safe_publish_progress(distance, status="NAVIGATING")
                 time.sleep(0.5)
             
             self.navigation_active = False
             self._safe_publish_status("FAILED")
+            self._safe_publish_progress(0.0, status="FAILED")
             return False
             
         except Exception as e:
             self.get_logger().error(f"Erreur navigation locale: {e}")
             self.navigation_active = False
             self._safe_publish_status("FAILED")
+            self._safe_publish_progress(0.0, status="FAILED")
             return False
 
     def calculate_distance(self):
+        # Calcule la distance 3D entre la position actuelle et la cible
         current = self.current_pose
         target = self.target_position
         
@@ -301,6 +337,7 @@ class LocalNavigationNode(Node):
         return math.sqrt(x_dist**2 + y_dist**2 + z_dist**2)
 
     def publish_setpoint(self):
+        # Publie la cible locale (PoseStamped) vers MAVROS si navigation active et sécurité OK
         if not self.navigation_active or not self.safe_to_navigate:
             return
             
@@ -317,16 +354,18 @@ class LocalNavigationNode(Node):
         
         # Orientation correcte avec quaternion du yaw
         yaw = target.get('yaw', 0.0)
-        q = quaternion_from_euler(0, 0, yaw)  # roll=0, pitch=0, yaw=yaw
-        msg.pose.orientation.x = q[0]
-        msg.pose.orientation.y = q[1]
-        msg.pose.orientation.z = q[2]
-        msg.pose.orientation.w = q[3]
+        # euler2quat retourne (w, x, y, z)
+        q = euler2quat(0, 0, yaw)
+        msg.pose.orientation.x = q[1]
+        msg.pose.orientation.y = q[2]
+        msg.pose.orientation.z = q[3]
+        msg.pose.orientation.w = q[0]
         
         with self._pub_lock:
             self.setpoint_pub.publish(msg)
 
-    def _safe_publish_progress(self, distance):
+    def _safe_publish_progress(self, distance, status="NAVIGATING"):
+        # Publie la progression de la navigation (PathProgress) avec distance restante et statut
         msg = PathProgress()
         msg.stamp = self.get_clock().now().to_msg()
         msg.progress = max(0.0, min(1.0, 1.0 - (distance / 50.0)))
@@ -346,12 +385,13 @@ class LocalNavigationNode(Node):
         else:
             msg.target_position = Point(x=0.0, y=0.0, z=0.0)
         
-        msg.status = "NAVIGATING"
+        msg.status = status
         
         with self._pub_lock:
             self.progress_pub.publish(msg)
 
     def _safe_publish_status(self, status):
+        # Publie le statut de la navigation (NavigationStatus) avec mode et progrès
         msg = NavigationStatus()
         msg.stamp = self.get_clock().now().to_msg()
         msg.status = status
@@ -379,6 +419,7 @@ class LocalNavigationNode(Node):
             self.status_pub.publish(msg)
 
     def maintain_current_position(self):
+        # Maintient la position actuelle du drone (utilisé en cas d'arrêt ou de pause)
         """Maintenir la position actuelle - thread-safe"""
         current = self.current_pose
         if current:
@@ -391,6 +432,7 @@ class LocalNavigationNode(Node):
                 self.setpoint_pub.publish(msg)
 
     def destroy_node(self):
+        # Nettoyage du nœud : arrêt de la navigation et du ThreadPoolExecutor
         # Nettoyage thread-safe
         self.navigation_active = False
         if self._navigation_future:
@@ -399,6 +441,7 @@ class LocalNavigationNode(Node):
         super().destroy_node()
 
 def main(args=None):
+    # Point d'entrée principal du nœud de navigation locale
     rclpy.init(args=args)
     node = LocalNavigationNode()
     

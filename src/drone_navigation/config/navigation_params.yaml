@@ -29,16 +29,16 @@ waypoint_manager_node:
 
 emergency_handler_node:
   ros__parameters:
-    low_battery_threshold: 15.0
+    low_battery_threshold: 20.0
     critical_battery_threshold: 5.0
-    gps_timeout: 5.0
+    gps_timeout: 10.0
     comms_timeout: 10.0
-    return_home_altitude: 50.0
+    return_home_altitude: 40.0
     emergency_action_cooldown: 30.0
 
 navigation_supervisor_node:
   ros__parameters:
-    state_timeout: 30.0
+    state_timeout: 120.0
     max_navigation_time: 3600.0
     emergency_response_delay: 2.0
     supervision_rate: 1.0

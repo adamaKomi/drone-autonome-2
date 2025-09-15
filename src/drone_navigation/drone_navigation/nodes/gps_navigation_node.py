@@ -23,9 +23,10 @@ from drone_msgs.msg import PathProgress, NavigationStatus
 
 class GPSNavigationNode(Node):
     def __init__(self):
+        # Initialisation du nœud de navigation GPS
         super().__init__('gps_navigation_node')
         
-        # État interne avec protection mutex
+    # Variables d'état interne (navigation, cible, GPS, sécurité)
         self._state_lock = threading.RLock()
         self._navigation_active = False
         self._target_position = None
@@ -33,41 +34,41 @@ class GPSNavigationNode(Node):
         self._safe_to_navigate = False
         self._navigation_future = None
         
-        # ThreadPoolExecutor pour les tâches longues
+    # ThreadPoolExecutor pour exécuter la navigation en tâche de fond
         self._executor = ThreadPoolExecutor(max_workers=2)
         
-        # Configuration
+    # Chargement des paramètres de configuration (tolérance, timeout)
         self.declare_parameter('default_tolerance', 2.0)
         self.declare_parameter('navigation_timeout', 300.0)  # Timeout en secondes (par défaut 5 min)
         self.default_tolerance = self.get_parameter('default_tolerance').value
         self.navigation_timeout = self.get_parameter('navigation_timeout').value
         
-        # Publishers avec protection
+    # Publishers pour diffuser les consignes, la progression et le statut
         self._pub_lock = threading.Lock()
         self.setpoint_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', 10)
         self.progress_pub = self.create_publisher(PathProgress, '/drone_nav/progress', 10)
         self.status_pub = self.create_publisher(NavigationStatus, '/drone_nav/status', 10)
         
-        # Subscribers
+    # Souscriptions aux topics de sécurité et GPS
         self.create_subscription(Bool, '/drone_nav/safe_to_navigate', self.safety_callback, 10)
         self.create_subscription(
             NavSatFix, '/mavros/global_position/global', self.gps_callback,
             QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         )
         
-        # Services
+    # Services pour recevoir les commandes de navigation et mise à jour de cible
         self.goto_service = self.create_service(GotoPosition, '/drone_nav/goto_position', self.handle_goto_position)
         self.update_service = self.create_service(UpdatePosition, '/drone_nav/update_position', self.handle_update_position)
         
-        # Action Server
+    # Action Server pour navigation avec feedback
         self.action_server = ActionServer(self, GotoPositionAction, '/drone_nav/goto_position_action', self.execute_action)
         
-        # Timer pour setpoints
+    # Timer pour publier régulièrement les consignes de position
         self.setpoint_timer = self.create_timer(0.1, self.publish_setpoint)
         
         self.get_logger().info("GPS Navigation Node initialized with MultiThreadedExecutor")
 
-    # Propriétés thread-safe
+    # Propriétés thread-safe pour accéder/modifier l'état interne
     @property
     def navigation_active(self):
         with self._state_lock:
@@ -109,12 +110,15 @@ class GPSNavigationNode(Node):
             self._safe_to_navigate = value
 
     def safety_callback(self, msg):
+        # Callback pour la sécurité (Bool)
         self.safe_to_navigate = msg.data
 
     def gps_callback(self, msg):
+        # Callback pour la position GPS courante
         self.current_gps = msg
 
     def handle_goto_position(self, request, response):
+        # Service pour démarrer une navigation GPS
         if not self.safe_to_navigate:
             response.success = False
             response.message = "Non sécurisé pour naviguer"
@@ -145,6 +149,7 @@ class GPSNavigationNode(Node):
         return response
 
     def handle_update_position(self, request, response):
+        # Service pour mettre à jour la cible GPS en cours de navigation
         if not self.navigation_active:
             response.success = False
             response.message = "Aucune navigation active"
@@ -167,6 +172,7 @@ class GPSNavigationNode(Node):
         return response
 
     def execute_action(self, goal_handle):
+        # ActionServer : navigation GPS avec feedback et gestion d'annulation
         self.target_position = {
             'latitude': goal_handle.request.latitude,
             'longitude': goal_handle.request.longitude,
@@ -193,6 +199,7 @@ class GPSNavigationNode(Node):
         return result
 
     def _navigate_with_feedback(self, goal_handle):
+        # Boucle de navigation avec feedback pour l'action
         try:
             step_duration = 0.5  # secondes
             max_steps = int(self.navigation_timeout / step_duration)
@@ -235,6 +242,7 @@ class GPSNavigationNode(Node):
             return False
 
     def _navigate_to_position(self):
+        # Boucle de navigation simple (service)
         try:
             step_duration = 0.5  # secondes
             max_steps = int(self.navigation_timeout / step_duration)
@@ -265,6 +273,7 @@ class GPSNavigationNode(Node):
             return False
 
     def calculate_distance(self):
+        # Calcule la distance géodésique entre la position courante et la cible
         current = self.current_gps
         target = self.target_position
         
@@ -286,6 +295,7 @@ class GPSNavigationNode(Node):
         return math.sqrt(horizontal_dist**2 + alt_dist**2)
 
     def publish_setpoint(self):
+        # Publie la consigne GPS vers MAVROS si navigation active
         if not self.navigation_active or not self.safe_to_navigate:
             return
             
@@ -310,6 +320,7 @@ class GPSNavigationNode(Node):
             self.setpoint_pub.publish(msg)
 
     def _safe_publish_progress(self, distance):
+        # Publie la progression de la navigation (PathProgress)
         msg = PathProgress()
         msg.stamp = self.get_clock().now().to_msg()
         msg.progress = max(0.0, min(1.0, 1.0 - (distance / 100.0)))
@@ -330,6 +341,7 @@ class GPSNavigationNode(Node):
             self.progress_pub.publish(msg)
 
     def _safe_publish_status(self, status):
+        # Publie le statut de navigation (NavigationStatus)
         msg = NavigationStatus()
         msg.stamp = self.get_clock().now().to_msg()
         msg.status = status
@@ -346,6 +358,7 @@ class GPSNavigationNode(Node):
             self.status_pub.publish(msg)
 
     def destroy_node(self):
+        # Nettoyage du nœud et arrêt des tâches en cours
         # Nettoyage thread-safe
         self.navigation_active = False
         if self._navigation_future:
@@ -354,13 +367,12 @@ class GPSNavigationNode(Node):
         super().destroy_node()
 
 def main(args=None):
+    # Point d'entrée principal du nœud GPS
     rclpy.init(args=args)
     node = GPSNavigationNode()
-    
-    # MultiThreadedExecutor avec 4 threads
+    # Exécuteur multi-thread pour gérer les callbacks et timers
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
-    
     try:
         executor.spin()
     except KeyboardInterrupt:

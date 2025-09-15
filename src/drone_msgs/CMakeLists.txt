@@ -23,7 +23,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   # Messages
 
 
-  # Messages utilisés dans drone_navigation
   "msg/Waypoint.msg"
   "msg/WaypointList.msg"
   "msg/MissionStatus.msg"
@@ -59,7 +58,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 
 
-  # Services utilisés dans drone_navigation
   "srv/LoadWaypoints.srv"
   "srv/SaveWaypoints.srv"
   "srv/GetWaypoint.srv"
@@ -76,6 +74,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ResumeMission.srv"
   "srv/GetMissionStatus.srv"
   "srv/SetMissionMode.srv"
+  "srv/SetWaypoints.srv"
 
   # Les autres services sont commentés pour accélérer la compilation
   # "srv/ArmDrone.srv"
@@ -96,8 +95,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   # "srv/SetGeofence.srv"
   # "srv/SetTrajectory.srv"
   # "srv/SetWaypoint.srv"
-  # "srv/SetWaypoints.srv"
-  # "srv/GetWaypoints.srv"
+  "srv/GetWaypoints.srv"
   # "srv/SystemDiagnostic.srv"
   # "srv/Takeoff.srv"
   # "srv/UpdateParameters.srv"

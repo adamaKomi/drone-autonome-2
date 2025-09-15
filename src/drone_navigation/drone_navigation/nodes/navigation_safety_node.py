@@ -9,7 +9,8 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool, Float64, String
-from mavros_msgs.msg import State, BatteryState
+from mavros_msgs.msg import State
+from sensor_msgs.msg import BatteryState
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
 
@@ -17,11 +18,19 @@ class NavigationSafetyNode(Node):
     def __init__(self):
         super().__init__('navigation_safety_node')
         
-        # Thread safety
+    # Thread safety
+    # _state_lock : protège l'accès concurrent à l'état du drone (batterie, GPS, etc.)
+    # _publish_lock : protège la publication sur les topics
         self._state_lock = threading.RLock()
         self._publish_lock = threading.RLock()
         
-        # État interne protégé
+    # État interne protégé
+    # _mavros_state : dernier état MAVROS reçu
+    # _battery_level : niveau de batterie en %
+    # _current_gps : dernière position GPS reçue
+    # _current_pose : dernière position locale reçue
+    # _current_rel_alt : dernière altitude relative reçue
+    # _last_safety_check : timestamp du dernier check sécurité
         self._mavros_state = None
         self._battery_level = 100.0
         self._current_gps = None
@@ -29,7 +38,11 @@ class NavigationSafetyNode(Node):
         self._current_rel_alt = None
         self._last_safety_check = None
         
-        # Paramètres de sécurité
+    # Paramètres de sécurité
+    # low_battery_threshold : seuil de batterie faible
+    # min_takeoff_altitude : altitude minimale pour navigation
+    # max_speed : vitesse maximale autorisée
+    # safety_check_rate : fréquence des vérifications de sécurité
         self.declare_parameter('low_battery_threshold', 20.0)
         self.declare_parameter('min_takeoff_altitude', 1.5)
         self.declare_parameter('max_speed', 15.0)
@@ -39,20 +52,28 @@ class NavigationSafetyNode(Node):
         self._min_takeoff_altitude = self.get_parameter('min_takeoff_altitude').value
         self._safety_check_rate = self.get_parameter('safety_check_rate').value
         
-        # Publishers thread-safe
+    # Publishers thread-safe
+    # _safe_to_navigate_pub : publie l'état de sécurité global
+    # _safety_status_pub : publie le message de statut de sécurité
         self._safe_to_navigate_pub = self.create_publisher(Bool, '/drone_nav/safe_to_navigate', 10)
         self._safety_status_pub = self.create_publisher(String, '/drone_nav/safety_status', 10)
         
-        # QoS profile pour topics MAVROS
+    # QoS profile pour topics MAVROS
         mavros_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
+        battery_qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.BEST_EFFORT)
         
-        # Subscribers
+    # Subscribers
+    # /mavros/state : reçoit l'état MAVROS
+    # /mavros/battery : reçoit le niveau de batterie
+    # /mavros/global_position/global : reçoit la position GPS
+    # /mavros/local_position/pose : reçoit la position locale
+    # /mavros/global_position/rel_alt : reçoit l'altitude relative
         self.create_subscription(
             State, '/mavros/state', self._state_callback, mavros_qos
         )
         
         self.create_subscription(
-            BatteryState, '/mavros/battery', self._battery_callback, 10
+            BatteryState, '/mavros/battery', self._battery_callback, battery_qos
         )
         
         self.create_subscription(
@@ -67,7 +88,8 @@ class NavigationSafetyNode(Node):
             Float64, '/mavros/global_position/rel_alt', self._rel_alt_callback, mavros_qos
         )
         
-        # Timer pour les vérifications de sécurité
+    # Timer pour les vérifications de sécurité
+    # Vérifie périodiquement les conditions de sécurité
         self._safety_timer = self.create_timer(
             1.0 / self._safety_check_rate, 
             self._check_safety_timer_callback
@@ -76,6 +98,7 @@ class NavigationSafetyNode(Node):
         self.get_logger().info("Navigation Safety Node initialized")
 
     # Propriétés thread-safe pour l'état
+    # Les propriétés suivantes protègent l'accès concurrent aux variables d'état
     @property
     def mavros_state(self):
         with self._state_lock:
@@ -102,26 +125,32 @@ class NavigationSafetyNode(Node):
             return self._current_rel_alt
 
     def _state_callback(self, msg):
+        # Callback appelé à chaque message d'état MAVROS reçu
         with self._state_lock:
             self._mavros_state = msg
 
     def _battery_callback(self, msg):
+        # Callback appelé à chaque message de batterie reçu
         with self._state_lock:
             self._battery_level = msg.percentage * 100.0
 
     def _gps_callback(self, msg):
+        # Callback appelé à chaque message GPS reçu
         with self._state_lock:
             self._current_gps = msg
 
     def _pose_callback(self, msg):
+        # Callback appelé à chaque message de position locale reçu
         with self._state_lock:
             self._current_pose = msg
 
     def _rel_alt_callback(self, msg):
+        # Callback appelé à chaque message d'altitude relative reçu
         with self._state_lock:
             self._current_rel_alt = msg.data
 
     def _check_safety_timer_callback(self):
+        # Timer : vérifie périodiquement les conditions de sécurité
         """Callback du timer pour vérification de sécurité périodique"""
         try:
             safe, message = self._perform_safety_check()
@@ -134,6 +163,7 @@ class NavigationSafetyNode(Node):
             self.get_logger().error(f"Erreur lors de la vérification de sécurité: {e}")
 
     def _perform_safety_check(self):
+        # Vérifie si toutes les conditions de sécurité sont remplies pour autoriser la navigation
         """Vérifie si les conditions de sécurité sont remplies pour la navigation"""
         
         # Obtenir une copie thread-safe des états
@@ -178,10 +208,9 @@ class NavigationSafetyNode(Node):
             if current_gps.altitude < -500 or current_gps.altitude > 10000:
                 return False, "Altitude GPS invalide"
                 
-            # Vérification de la précision GPS
-            if hasattr(current_gps, 'position_covariance') and current_gps.position_covariance:
-                # Vérifier la précision si disponible
-                if current_gps.position_covariance[0] > 100.0:  # Variance trop élevée
+            # Vérification de la précision GPS (variance X)
+            if hasattr(current_gps, 'position_covariance') and len(current_gps.position_covariance) > 0:
+                if current_gps.position_covariance[0] > 100.0:  # Variance X trop élevée
                     return False, "Précision GPS insuffisante"
         else:
             return False, "Données GPS non disponibles"
@@ -193,6 +222,7 @@ class NavigationSafetyNode(Node):
         return True, "Prêt pour navigation"
 
     def _publish_safety_status(self, safe, message):
+        # Publie l'état de sécurité (booléen et message) sur les topics dédiés
         """Publication thread-safe du statut de sécurité"""
         try:
             with self._publish_lock:
@@ -216,10 +246,12 @@ class NavigationSafetyNode(Node):
             self.get_logger().error(f"Erreur lors de la publication du statut: {e}")
 
     def get_safety_status(self):
+        # Méthode publique pour obtenir le statut de sécurité actuel
         """Méthode publique pour obtenir le statut de sécurité actuel"""
         return self._perform_safety_check()
 
     def destroy_node(self):
+        # Nettoyage du nœud : arrêt du timer et destruction propre
         """Nettoyage lors de la destruction du nœud"""
         try:
             if hasattr(self, '_safety_timer'):
@@ -231,6 +263,7 @@ class NavigationSafetyNode(Node):
             super().destroy_node()
 
 def main(args=None):
+    # Point d'entrée principal du nœud de sécurité navigation
     rclpy.init(args=args)
     
     node = NavigationSafetyNode()

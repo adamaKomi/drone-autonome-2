@@ -58,8 +58,8 @@ Nœud ROS2 de navigation GPS pour drone autonome. Il reçoit des commandes de na
    ```
 4. Appeler le service de navigation (SITL recommandé : tolérance 20.0 m) :
   ```bash
-  ros2 service call /drone_nav/goto_position drone_msgs/srv/GotoPosition "{latitude: 48.86, longitude: 2.36, altitude: 55.0, yaw_angle: 0.0, tolerance: 20.0}"
-  ```
+  ros2 service call /drone_nav/goto_position drone_msgs/srv/GotoPosition "{latitude: 33.70913368 , longitude: -7.34989784, altitude: 55.0, yaw_angle: 0.0, tolerance: 20.0}"
+  ``` 
 5. Utiliser l'action pour navigation asynchrone (SITL recommandé : tolérance 20.0 m) :
   ```bash
   ros2 action send_goal /drone_nav/goto_position_action drone_msgs/action/GotoPositionAction "{latitude: 48.86, longitude: 2.36, altitude: 55.0, yaw_angle: 0.0, tolerance: 20.0}"
