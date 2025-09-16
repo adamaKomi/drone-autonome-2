@@ -24,8 +24,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'waypoint_manager_node = drone_navigation.nodes.waypoint_manager_node:main',
-            'mission_manager_node = drone_navigation.nodes.mission_manager_node:main',
             'gps_navigation_node = drone_navigation.nodes.gps_navigation_node:main',
             'local_navigation_node = drone_navigation.nodes.local_navigation_node:main',
             'navigation_safety_node = drone_navigation.nodes.navigation_safety_node:main',

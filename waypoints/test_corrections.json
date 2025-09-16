@@ -1,0 +1,15 @@
+[
+  {
+    "position": {
+      "x": 10.0,
+      "y": 20.0,
+      "z": 30.0
+    },
+    "tolerance": 2.0,
+    "wp_type": "NORMAL",
+    "actions": [],
+    "speed": 5.0,
+    "yaw": 0.0,
+    "hold_time": 0.0
+  }
+]

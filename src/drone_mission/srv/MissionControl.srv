@@ -1,7 +1,0 @@
-# Service pour contrôler l'exécution des missions
-# Commandes possibles: START, PAUSE, RESUME, STOP, EMERGENCY
-
-string command
----
-bool success
-string message

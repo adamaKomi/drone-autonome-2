@@ -318,6 +318,10 @@ class EmergencyHandlerNode(Node):
         """Publier le statut de sécurité pour les autres nœuds"""
         safe = self.is_safe_to_navigate()
         
+        # Log avec emoji avant publication
+        emergency_emoji = "🚨✅" if safe else "🚨❌"
+        self.get_logger().info(f"{emergency_emoji} EMERGENCY NODE: Publication safe_to_navigate = {safe}")
+        
         with self._pub_lock:
             msg = Bool()
             msg.data = safe

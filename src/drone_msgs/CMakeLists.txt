@@ -75,6 +75,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/GetMissionStatus.srv"
   "srv/SetMissionMode.srv"
   "srv/SetWaypoints.srv"
+  "srv/CancelNavigation.srv"
 
   # Les autres services sont commentés pour accélérer la compilation
   # "srv/ArmDrone.srv"
@@ -99,7 +100,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   # "srv/SystemDiagnostic.srv"
   # "srv/Takeoff.srv"
   # "srv/UpdateParameters.srv"
-  # "srv/CancelNavigation.srv"
+  
 
   
 

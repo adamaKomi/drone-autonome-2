@@ -67,9 +67,14 @@ Nœud ROS2 de navigation GPS pour drone autonome. Il reçoit des commandes de na
 
 
 ## Suggestions d'amélioration à prévoir
+
 - Ajouter un service ROS2 dédié pour annuler une navigation en cours lancée via le service `/drone_nav/goto_position` (actuellement seule l'action peut être annulée).
   - Exemple : `/drone_nav/cancel_navigation` (type `std_srvs/Trigger` ou personnalisé)
   - Permettre à un superviseur ou à l'opérateur d'interrompre la navigation à tout moment.
+
+- Ajouter la possibilité de changer dynamiquement la cible GPS pendant la navigation, même si le drone n'a pas encore atteint le point prévu.
+  - Permettre d'appeler `/drone_nav/update_position` à tout moment pour modifier la cible en cours.
+  - Gérer la logique de transition et de sécurité lors du changement de cible.
 
 ## Notes
 - Le nœud nécessite MAVROS et une source de position GPS (SITL ou drone réel).

@@ -31,20 +31,23 @@ class NavigationSafetyNode(Node):
     # _current_pose : dernière position locale reçue
     # _current_rel_alt : dernière altitude relative reçue
     # _last_safety_check : timestamp du dernier check sécurité
+    # _altitude_violations : compteur pour violations temporaires d'altitude
         self._mavros_state = None
         self._battery_level = 100.0
         self._current_gps = None
         self._current_pose = None
         self._current_rel_alt = None
         self._last_safety_check = None
+        self._altitude_violations = 0
+        self._max_altitude_violations = 3  # Tolérer 3 violations consécutives
         
     # Paramètres de sécurité
     # low_battery_threshold : seuil de batterie faible
-    # min_takeoff_altitude : altitude minimale pour navigation
+    # min_takeoff_altitude : altitude minimale pour navigation (réduite pour tolérer les variations)
     # max_speed : vitesse maximale autorisée
     # safety_check_rate : fréquence des vérifications de sécurité
         self.declare_parameter('low_battery_threshold', 20.0)
-        self.declare_parameter('min_takeoff_altitude', 1.5)
+        self.declare_parameter('min_takeoff_altitude', 0.8)  # Réduit de 1.5m à 0.8m
         self.declare_parameter('max_speed', 15.0)
         self.declare_parameter('safety_check_rate', 1.0)
         
@@ -188,9 +191,23 @@ class NavigationSafetyNode(Node):
         if mavros_state.mode not in valid_modes:
             return False, f"Mode {mavros_state.mode} non supporté"
         
-        # Vérification de l'altitude minimale
-        if current_rel_alt is not None and current_rel_alt < self._min_takeoff_altitude:
-            return False, f"Altitude insuffisante ({current_rel_alt:.1f}m)"
+        # Vérification de l'altitude minimale avec tolérance pour variations temporaires
+        if current_rel_alt is not None:
+            if current_rel_alt < self._min_takeoff_altitude:
+                # Incrémenter le compteur de violations
+                with self._state_lock:
+                    self._altitude_violations += 1
+                
+                # Seulement échouer si on a trop de violations consécutives
+                if self._altitude_violations > self._max_altitude_violations:
+                    return False, f"Altitude insuffisante persistante ({current_rel_alt:.1f}m < {self._min_takeoff_altitude:.1f}m)"
+                else:
+                    # Violation temporaire tolérée
+                    pass
+            else:
+                # Altitude OK, réinitialiser le compteur
+                with self._state_lock:
+                    self._altitude_violations = 0
         
         # Vérification de la position locale
         if not current_pose:
@@ -226,6 +243,10 @@ class NavigationSafetyNode(Node):
         """Publication thread-safe du statut de sécurité"""
         try:
             with self._publish_lock:
+                # Log avec emoji avant publication
+                safety_emoji = "🛡️✅" if safe else "🛡️❌"
+                self.get_logger().info(f"{safety_emoji} SAFETY NODE: Publication safe_to_navigate = {safe} - {message}")
+                
                 # Publier le statut booléen
                 safe_msg = Bool()
                 safe_msg.data = safe
@@ -238,9 +259,9 @@ class NavigationSafetyNode(Node):
                 
             # Log selon le niveau approprié
             if not safe:
-                self.get_logger().warn(f"Safety check failed: {message}")
+                self.get_logger().warn(f"🚨 Safety check failed: {message}")
             else:
-                self.get_logger().debug(f"Safety check passed: {message}")
+                self.get_logger().debug(f"✅ Safety check passed: {message}")
                 
         except Exception as e:
             self.get_logger().error(f"Erreur lors de la publication du statut: {e}")

@@ -1,9 +1,0 @@
-# Service pour créer une mission dynamiquement
-
-string mission_name
-string description
-string tasks_json  # JSON array des tâches
----
-bool success
-string message
-string mission_id

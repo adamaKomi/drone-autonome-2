@@ -2,22 +2,17 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>drone_mission</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="adama133@todo.todo">adama133</maintainer>
-  <license>TODO: License declaration</license>
+  <version>1.0.0</version>
+  <description>Mission planning and execution package for autonomous drone operations</description>
+  <maintainer email="adamakomi15@gmail.com">Adama Komi</maintainer>
+  <license>Apache-2.0</license>
 
   <depend>rclpy</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
-  <depend>yaml_cpp_vendor</depend>
-  <depend>drone_interface</depend>
+  <depend>drone_msgs</depend>
   <depend>drone_navigation</depend>
-  
-  <build_depend>rosidl_default_generators</build_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
@@ -25,6 +20,6 @@
   <test_depend>python3-pytest</test_depend>
 
   <export>
-    <build_type>ament_cmake</build_type>
+    <build_type>ament_python</build_type>
   </export>
 </package>

@@ -1,15 +1,20 @@
 navigation_safety_node:
   ros__parameters:
     low_battery_threshold: 20.0
-    min_takeoff_altitude: 1.5
+    min_takeoff_altitude: 0.8
     max_speed: 15.0
     safety_check_rate: 1.0
 
 gps_navigation_node:
   ros__parameters:
-    default_tolerance: 20.0
+    default_tolerance: 2.0
     navigation_timeout: 300.0
     max_retry_attempts: 3
+    # Configuration de l'altitude
+    altitude_mode: "relative"  # "relative" ou "absolute"
+    relative_altitude_default: 50.0  # Altitude relative par défaut en mètres
+    min_safe_altitude: 100.0  # Altitude AMSL minimale de sécurité en mètres
+    setpoint_rate: 10.0  # Fréquence de publication des setpoints
 
 mission_manager_node:
   ros__parameters:

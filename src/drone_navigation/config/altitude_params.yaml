@@ -1,0 +1,43 @@
+# Configuration des paramètres d'altitude pour drone_navigation
+# Ce fichier configure la gestion de l'altitude pour éviter les problèmes d'atterrissage non souhaités
+
+/**:
+  ros__parameters:
+    
+    # ===== GPS Navigation Parameters =====
+    # Mode d'altitude : 'relative' (recommandé) ou 'absolute'
+    # - relative : altitude relative au terrain estimé
+    # - absolute : altitude AMSL (au-dessus du niveau de la mer)
+    altitude_mode: 'relative'
+    
+    # Altitude relative par défaut (mètres au-dessus du terrain)
+    relative_altitude_default: 50.0
+    
+    # Altitude AMSL minimale de sécurité (mètres)
+    # Pour Casablanca (~50m AMSL), minimum recommandé = 100m
+    min_safe_altitude: 100.0
+    
+    # Tolérance par défaut pour les navigations GPS (mètres)
+    default_tolerance: 2.0
+    
+    # Timeout pour les navigations GPS (secondes)
+    navigation_timeout: 300.0
+    
+    # Fréquence de publication des setpoints (Hz)
+    setpoint_rate: 10.0
+    
+    # ===== Local Navigation Parameters =====
+    # Altitude locale maximale (mètres depuis l'origine locale)
+    max_altitude_local: 100.0
+    
+    # Altitude locale minimale (mètres depuis l'origine locale)
+    min_altitude_local: 0.5
+    
+    # Tolérance par défaut pour les navigations locales (mètres)
+    default_tolerance_local: 1.0
+    
+    # Vitesse par défaut (m/s)
+    default_speed: 2.0
+    
+    # Vitesse maximale (m/s)
+    max_velocity: 5.0

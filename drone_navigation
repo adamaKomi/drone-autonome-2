@@ -1,0 +1,5 @@
+usage: ros2 launch [-h] [-n] [-d] [-p | -s] [-a]
+                   [--launch-prefix LAUNCH_PREFIX]
+                   [--launch-prefix-filter LAUNCH_PREFIX_FILTER]
+                   package_name [launch_file_name] [launch_arguments ...]
+ros2 launch: error: the following arguments are required: package_name, launch_arguments

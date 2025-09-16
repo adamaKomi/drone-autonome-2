@@ -45,10 +45,14 @@ class LocalNavigationNode(Node):
         self.declare_parameter('default_tolerance', 1.0)
         self.declare_parameter('default_speed', 2.0)
         self.declare_parameter('max_velocity', 5.0)
+        self.declare_parameter('max_altitude_local', 100.0)  # Altitude locale maximale (sécurité)
+        self.declare_parameter('min_altitude_local', 0.5)    # Altitude locale minimale (sécurité)
         
         self.default_tolerance = self.get_parameter('default_tolerance').value
         self.default_speed = self.get_parameter('default_speed').value
         self.max_velocity = self.get_parameter('max_velocity').value
+        self.max_altitude_local = self.get_parameter('max_altitude_local').value
+        self.min_altitude_local = self.get_parameter('min_altitude_local').value
         
     # Publishers avec protection
     # setpoint_pub : publie la cible locale (PoseStamped) vers MAVROS
@@ -150,10 +154,17 @@ class LocalNavigationNode(Node):
         tolerance = self.default_tolerance
         yaw_angle = getattr(request, 'yaw_angle', 0.0)
         
+        # Valider et ajuster la position locale
+        x_safe, y_safe, z_safe, validation_msg = self._validate_local_position(request.x, request.y, request.z)
+        self.get_logger().info(f"🎯 Navigation locale - {validation_msg}")
+        
         self.target_position = {
-            'x': request.x,
-            'y': request.y,
-            'z': request.z,
+            'x': x_safe,
+            'y': y_safe,
+            'z': z_safe,
+            'original_x': request.x,
+            'original_y': request.y,
+            'original_z': request.z,
             'yaw': yaw_angle,
             'tolerance': tolerance
         }
@@ -175,13 +186,20 @@ class LocalNavigationNode(Node):
             response.message = "Aucune navigation active"
             return response
         
+        # Valider et ajuster la nouvelle position locale
+        x_safe, y_safe, z_safe, validation_msg = self._validate_local_position(request.x, request.y, request.z)
+        self.get_logger().info(f"🔄 Mise à jour locale - {validation_msg}")
+        
         # Mise à jour thread-safe avec validation
         with self._state_lock:
             if self._target_position:
                 self._target_position.update({
-                    'x': request.x,
-                    'y': request.y,
-                    'z': request.z,
+                    'x': x_safe,
+                    'y': y_safe,
+                    'z': z_safe,
+                    'original_x': request.x,
+                    'original_y': request.y,
+                    'original_z': request.z,
                     'yaw': request.yaw_angle
                 })
         
@@ -194,10 +212,18 @@ class LocalNavigationNode(Node):
         # Utilise correctement les champs de GotoLocalAction
         tolerance = goal_handle.request.tolerance if goal_handle.request.tolerance > 0 else self.default_tolerance
         
+        # Valider et ajuster la position locale pour l'action
+        x_safe, y_safe, z_safe, validation_msg = self._validate_local_position(
+            goal_handle.request.x, goal_handle.request.y, goal_handle.request.z)
+        self.get_logger().info(f"🎯 Action locale - {validation_msg}")
+        
         self.target_position = {
-            'x': goal_handle.request.x,
-            'y': goal_handle.request.y,
-            'z': goal_handle.request.z,
+            'x': x_safe,
+            'y': y_safe,
+            'z': z_safe,
+            'original_x': goal_handle.request.x,
+            'original_y': goal_handle.request.y,
+            'original_z': goal_handle.request.z,
             'yaw': goal_handle.request.yaw_angle,
             'tolerance': tolerance
         }
@@ -319,6 +345,44 @@ class LocalNavigationNode(Node):
             self._safe_publish_status("FAILED")
             self._safe_publish_progress(0.0, status="FAILED")
             return False
+
+    def _validate_local_position(self, x, y, z):
+        """
+        Valide et ajuste une position locale pour la sécurité
+        
+        Args:
+            x, y, z: Coordonnées locales demandées
+            
+        Returns:
+            tuple: (x_safe, y_safe, z_safe, validation_message)
+        """
+        x_safe, y_safe, z_safe = x, y, z
+        warnings = []
+        
+        # Validation de l'altitude locale (Z)
+        if z < self.min_altitude_local:
+            self.get_logger().warn(f"⚠️ Altitude locale {z:.2f}m trop basse ! Minimum: {self.min_altitude_local:.2f}m")
+            z_safe = self.min_altitude_local
+            warnings.append(f"Z ajustée à {z_safe:.2f}m (sécurité)")
+        elif z > self.max_altitude_local:
+            self.get_logger().warn(f"⚠️ Altitude locale {z:.2f}m trop haute ! Maximum: {self.max_altitude_local:.2f}m")
+            z_safe = self.max_altitude_local
+            warnings.append(f"Z ajustée à {z_safe:.2f}m (sécurité)")
+        
+        # Validation de distance horizontale (optionnel - limite la zone de navigation)
+        horizontal_dist = math.sqrt(x**2 + y**2)
+        max_horizontal = 200.0  # 200m max du point d'origine
+        if horizontal_dist > max_horizontal:
+            scale = max_horizontal / horizontal_dist
+            x_safe = x * scale
+            y_safe = y * scale
+            warnings.append(f"Position horizontale limitée à {max_horizontal}m de l'origine")
+        
+        message = "Position locale validée"
+        if warnings:
+            message += f" avec ajustements: {'; '.join(warnings)}"
+        
+        return x_safe, y_safe, z_safe, message
 
     def calculate_distance(self):
         # Calcule la distance 3D entre la position actuelle et la cible

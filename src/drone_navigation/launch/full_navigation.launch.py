@@ -26,24 +26,6 @@ def generate_launch_description():
             output='screen'
         ),
         
-        # Manager de mission
-        Node(
-            package='drone_navigation',
-            executable='mission_manager_node',
-            name='mission_manager_node',
-            parameters=[config_file],
-            output='screen'
-        ),
-        
-        # Manager de waypoints
-        Node(
-            package='drone_navigation',
-            executable='waypoint_manager_node',
-            name='waypoint_manager_node',
-            parameters=[config_file],
-            output='screen'
-        ),
-        
         # Gestionnaire d'urgence
         Node(
             package='drone_navigation',

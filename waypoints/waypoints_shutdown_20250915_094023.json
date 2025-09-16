@@ -1,0 +1,11 @@
+[
+  {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "tolerance": 2.0,
+    "speed": 5.0,
+    "wp_type": "NORMAL",
+    "hold_time": 0.0
+  }
+]
